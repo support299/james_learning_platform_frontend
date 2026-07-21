@@ -1,0 +1,138 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-sans:
+    'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Shared prose styling for rich-text lesson content — applied to both the
+   Tiptap editing surface (admin) and the read-only rendered HTML (student). */
+.lesson-html {
+  color: #374151; /* gray-700 */
+  line-height: 1.7;
+}
+.lesson-html:focus,
+.lesson-html:focus-visible {
+  outline: none;
+}
+.lesson-html > :first-child {
+  margin-top: 0;
+}
+.lesson-html h1 {
+  margin: 1.75rem 0 0.5rem;
+  font-size: 1.5rem;
+  line-height: 2rem;
+  font-weight: 800;
+  color: #111827; /* gray-900 */
+}
+.lesson-html h2 {
+  margin: 1.5rem 0 0.5rem;
+  font-size: 1.25rem;
+  line-height: 1.75rem;
+  font-weight: 700;
+  color: #111827; /* gray-900 */
+}
+.lesson-html h3 {
+  margin: 1rem 0 0.375rem;
+  font-size: 1.125rem;
+  line-height: 1.75rem;
+  font-weight: 600;
+  color: #1f2937; /* gray-800 */
+}
+.lesson-html h4 {
+  margin: 1rem 0 0.35rem;
+  font-size: 1rem;
+  line-height: 1.5rem;
+  font-weight: 700;
+  color: #1f2937; /* gray-800 */
+}
+.lesson-html h5 {
+  margin: 0.75rem 0 0.3rem;
+  font-size: 0.9rem;
+  line-height: 1.4rem;
+  font-weight: 700;
+  color: #374151; /* gray-700 */
+}
+.lesson-html h6 {
+  margin: 0.75rem 0 0.3rem;
+  font-size: 0.78rem;
+  line-height: 1.2rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #6b7280; /* gray-500 */
+}
+.lesson-html p {
+  margin: 0 0 0.75rem;
+}
+.lesson-html ul,
+.lesson-html ol {
+  margin: 0 0 0.75rem;
+  padding-left: 1.5rem;
+}
+.lesson-html ul {
+  list-style: disc;
+}
+.lesson-html ol {
+  list-style: decimal;
+}
+.lesson-html li {
+  margin-bottom: 0.375rem;
+}
+.lesson-html strong {
+  font-weight: 700;
+  color: #111827;
+}
+.lesson-html em {
+  font-style: italic;
+}
+.lesson-html blockquote {
+  margin: 0 0 0.75rem;
+  border-left: 3px solid #e5e7eb;
+  padding-left: 1rem;
+  color: #4b5563;
+  font-style: italic;
+}
+.lesson-html a {
+  color: #c2410c; /* orange-700 */
+  text-decoration: underline;
+}
+.lesson-html u {
+  text-decoration: underline;
+}
+.lesson-html mark {
+  background: #fef08a; /* yellow-200 */
+  padding: 0.05em 0.1em;
+  border-radius: 0.15rem;
+}
+.lesson-html code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.875em;
+  background: #f5f5f4;
+  padding: 0.1em 0.35em;
+  border-radius: 0.25rem;
+}
+.lesson-html hr {
+  margin: 1.25rem 0;
+  border: 0;
+  border-top: 1px solid #e5e7eb;
+}
+.lesson-html [data-embed],
+.lesson-html [data-youtube-video] {
+  margin: 1rem 0;
+  max-width: 100%;
+}
+.lesson-html [data-embed] iframe,
+.lesson-html [data-youtube-video] iframe {
+  width: 100%;
+  max-width: 100%;
+  aspect-ratio: 16 / 9;
+  height: auto;
+  border-radius: 0.5rem;
+  border: 1px solid #e5e7eb;
+}
+/* Selected embed in the editor */
+.lesson-html .ProseMirror-selectednode {
+  outline: 2px solid #ea580c;
+  outline-offset: 2px;
+}
