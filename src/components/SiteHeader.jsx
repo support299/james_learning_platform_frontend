@@ -1,10 +1,9 @@
 import { Link } from 'react-router-dom'
-import { SearchIcon, BellIcon, UserIcon } from './Icons.jsx'
+import { SearchIcon, UserIcon } from './Icons.jsx'
 
 export default function SiteHeader({
   showSearch = false,
   searchPlaceholder = 'Search...',
-  showNotifications = false,
 }) {
   return (
     <header className="border-b border-gray-200 bg-white">
@@ -25,15 +24,6 @@ export default function SiteHeader({
         )}
 
         <div className="flex items-center gap-3">
-          {showNotifications && (
-            <button
-              type="button"
-              aria-label="Notifications"
-              className="flex size-9 items-center justify-center rounded-full text-gray-700 hover:bg-gray-100"
-            >
-              <BellIcon />
-            </button>
-          )}
           <span
             aria-label="Profile"
             className="flex size-9 items-center justify-center rounded-full bg-gray-100 text-gray-600"
