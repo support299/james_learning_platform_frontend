@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { SearchIcon, UserIcon } from './Icons.jsx'
+import { SearchIcon, UserIcon, LogoMark } from './Icons.jsx'
 
 export default function SiteHeader({
   showSearch = false,
@@ -8,8 +8,14 @@ export default function SiteHeader({
   return (
     <header className="border-b border-gray-200 bg-white">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-6 px-8 py-4">
-        <Link to="/" className="text-2xl font-extrabold tracking-tight text-blue-700">
-          AgentGrowth
+        <Link
+          to="/"
+          className="flex items-center gap-2.5 text-2xl font-extrabold tracking-tight"
+        >
+          <LogoMark size={32} className="text-[#0b0b0b]" />
+          <span className="text-gray-900">
+            Aftermath <span className="text-[#C8992E]">Academy</span>
+          </span>
         </Link>
 
         {showSearch && (

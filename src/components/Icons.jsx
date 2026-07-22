@@ -6,6 +6,32 @@ const base = {
   strokeLinejoin: 'round',
 }
 
+// Brand mark — anarchy "A" crossing a ring. Uses currentColor, so it inherits
+// its color from the surrounding text (dark on the header, white in the footer).
+export function LogoMark({ size = 32, className }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 120 120"
+      className={className}
+      aria-hidden="true"
+    >
+      <g
+        fill="currentColor"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <circle cx="60" cy="62" r="49" fill="none" strokeWidth="5.5" />
+        <path d="M60 17 L37 96" fill="none" strokeWidth="12" />
+        <path d="M60 17 L83 96" fill="none" strokeWidth="12" />
+        <path d="M20 103 Q64.6 78.5 103 45 Q58.4 69.5 20 103 Z" stroke="none" />
+      </g>
+    </svg>
+  )
+}
+
 export function SearchIcon({ size = 16 }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" {...base} aria-hidden="true">

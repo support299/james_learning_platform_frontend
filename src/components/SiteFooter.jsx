@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { LogoMark } from './Icons.jsx'
 
 export default function SiteFooter({ links }) {
   return (
@@ -6,11 +7,11 @@ export default function SiteFooter({ links }) {
       <div className="mx-auto max-w-7xl px-8 pt-12 pb-8">
         <div className="flex flex-wrap items-start justify-between gap-8">
           <div className="max-w-xs">
-            <span className="flex items-center gap-2 text-xl font-extrabold tracking-tight text-white">
-              <span className="flex size-8 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-blue-600 text-sm">
-                A
+            <span className="flex items-center gap-2.5 text-xl font-extrabold tracking-tight text-white">
+              <LogoMark size={32} />
+              <span>
+                Aftermath <span className="text-[#E4B94D]">Academy</span>
               </span>
-              AgentGrowth
             </span>
             <p className="mt-3 text-sm leading-relaxed text-gray-400">
               A focused, professional learning environment for building real skills.
@@ -37,7 +38,7 @@ export default function SiteFooter({ links }) {
         </div>
 
         <div className="mt-10 border-t border-gray-800 pt-6 text-xs text-gray-500">
-          © {new Date().getFullYear()} AgentGrowth. Professional Learning Environment.
+          © {new Date().getFullYear()} Aftermath Academy. Professional Learning Environment.
         </div>
       </div>
     </footer>
