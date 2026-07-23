@@ -4,6 +4,7 @@ import LessonPage from './pages/LessonPage.jsx'
 import AdminPage from './pages/AdminPage.jsx'
 import CourseEditPage from './pages/CourseEditPage.jsx'
 import LessonEditorPage from './pages/LessonEditorPage.jsx'
+import QuizEditorPage from './pages/QuizEditorPage.jsx'
 
 function App() {
   return (
@@ -18,6 +19,14 @@ function App() {
       <Route
         path="/admin/course/:courseId/lesson/:lessonId/edit"
         element={<LessonEditorPage />}
+      />
+      <Route
+        path="/admin/course/:courseId/quiz/new"
+        element={<QuizEditorPage />}
+      />
+      <Route
+        path="/admin/course/:courseId/quiz/:lessonId/edit"
+        element={<QuizEditorPage />}
       />
       <Route path="/course/:courseId/lesson/:lessonId" element={<LessonPage />} />
       <Route path="*" element={<Navigate to="/" replace />} />

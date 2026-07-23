@@ -1,6 +1,12 @@
 import { Link } from 'react-router-dom'
+import { useSelector } from 'react-redux'
 import { firstLessonPath } from '../data/courses.js'
+import {
+  selectCompletedForCourse,
+  selectCourseProgress,
+} from '../store/coursesSlice.js'
 import { StarIcon } from './Icons.jsx'
+import CourseProgress from './CourseProgress.jsx'
 
 const bannerByCategory = {
   design: 'bg-gradient-to-br from-blue-100 via-violet-100 to-pink-100',
@@ -10,6 +16,11 @@ const bannerByCategory = {
 
 export default function CourseCard({ course }) {
   const lessonPath = firstLessonPath(course)
+  const progress = useSelector((state) => selectCourseProgress(state, course))
+  const doneCount = useSelector(
+    (state) => Object.keys(selectCompletedForCourse(state, course.id)).length,
+  )
+  const totalLessons = course.lessons.length
 
   return (
     <article className="flex flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition-shadow hover:shadow-md">
@@ -40,6 +51,13 @@ export default function CourseCard({ course }) {
         </div>
         <h2 className="mb-2 text-xl font-bold text-gray-900">{course.title}</h2>
         <p className="flex-1 text-sm text-gray-500">{course.description}</p>
+        {totalLessons > 0 && (
+          <CourseProgress
+            value={progress}
+            done={doneCount}
+            total={totalLessons}
+          />
+        )}
         <div className="mt-4 flex items-center justify-between border-t border-gray-200 pt-4">
           <span
             className={`text-sm font-semibold ${course.cta === 'Resume' ? 'text-blue-700' : 'text-gray-700'}`}

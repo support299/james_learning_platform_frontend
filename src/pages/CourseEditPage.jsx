@@ -13,6 +13,7 @@ import {
   Field,
   inputClass,
   blackButton,
+  outlineButton,
   monoLabel,
   courseCategories,
 } from '../components/adminUi.jsx'
@@ -127,10 +128,13 @@ function LessonRow({
   onMove,
 }) {
   const dispatch = useDispatch()
-  const editPath = `/admin/course/${course.id}/lesson/${lesson.id}/edit`
+  const isQuiz = lesson.type === 'quiz'
+  const editPath = isQuiz
+    ? `/admin/course/${course.id}/quiz/${lesson.id}/edit`
+    : `/admin/course/${course.id}/lesson/${lesson.id}/edit`
 
   const remove = () => {
-    if (window.confirm(`Delete lesson "${lesson.title}"?`)) {
+    if (window.confirm(`Delete ${isQuiz ? 'quiz' : 'lesson'} "${lesson.title}"?`)) {
       dispatch(deleteLesson({ courseId: course.id, lessonId: lesson.id }))
     }
   }
@@ -195,7 +199,7 @@ function LessonRow({
         </button>
         <Link
           to={editPath}
-          aria-label="Edit lesson"
+          aria-label={isQuiz ? 'Edit quiz' : 'Edit lesson'}
           className="flex size-8 items-center justify-center text-stone-400 hover:text-orange-600"
         >
           <PencilIcon size={16} />
@@ -203,7 +207,7 @@ function LessonRow({
         <button
           type="button"
           onClick={remove}
-          aria-label="Delete lesson"
+          aria-label={isQuiz ? 'Delete quiz' : 'Delete lesson'}
           className="flex size-8 items-center justify-center text-stone-400 hover:text-red-600"
         >
           <TrashIcon size={16} />
@@ -253,6 +257,7 @@ export default function CourseEditPage() {
 
   const studentPath = firstLessonPath(course)
   const newLessonPath = `/admin/course/${course.id}/lesson/new`
+  const newQuizPath = `/admin/course/${course.id}/quiz/new`
 
   return (
     <div className="min-h-svh bg-[#f6f5f2]">
@@ -294,28 +299,49 @@ export default function CourseEditPage() {
               ({course.lessons.length})
             </span>
           </h2>
-          <button
-            type="button"
-            onClick={() => navigate(newLessonPath)}
-            className={blackButton}
-          >
-            + Add Lesson
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => navigate(newQuizPath)}
+              className={outlineButton}
+            >
+              + Add Quiz
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate(newLessonPath)}
+              className={blackButton}
+            >
+              + Add Lesson
+            </button>
+          </div>
         </div>
 
         {course.lessons.length === 0 ? (
-          <button
-            type="button"
-            onClick={() => navigate(newLessonPath)}
-            className="flex w-full flex-col items-center justify-center gap-2 border border-dashed border-stone-300 bg-white/60 px-6 py-14 text-center hover:border-stone-400"
-          >
+          <div className="flex w-full flex-col items-center justify-center gap-2 border border-dashed border-stone-300 bg-white/60 px-6 py-14 text-center">
             <span className="text-sm font-semibold text-stone-700">
               No lessons yet
             </span>
             <span className="text-sm text-stone-500">
-              Add your first lesson to get started.
+              Add your first lesson or quiz to get started.
             </span>
-          </button>
+            <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+              <button
+                type="button"
+                onClick={() => navigate(newLessonPath)}
+                className={blackButton}
+              >
+                + Add Lesson
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate(newQuizPath)}
+                className={outlineButton}
+              >
+                + Add Quiz
+              </button>
+            </div>
+          </div>
         ) : (
           <>
             <p className={`${monoLabel} mb-3`}>Drag to reorder</p>

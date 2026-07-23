@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
-import { firstLessonPath } from '../data/courses.js'
+import { firstLessonPath, categories } from '../data/courses.js'
 import {
   addCourse,
   deleteCourse,
@@ -10,7 +10,7 @@ import {
 import { slugify, uniqueSlug, formatDate } from '../utils/adminHelpers.js'
 import CourseCard from '../components/CourseCard.jsx'
 import SiteHeader from '../components/SiteHeader.jsx'
-import { DotsIcon } from '../components/Icons.jsx'
+import { DotsIcon, SearchIcon, ChevronIcon } from '../components/Icons.jsx'
 import {
   Modal,
   Field,
@@ -18,8 +18,17 @@ import {
   inputClass,
   monoLabel,
   blackButton,
+  outlineButton,
   courseCategories,
 } from '../components/adminUi.jsx'
+
+const PAGE_SIZE = 6
+
+const sortOptions = [
+  { value: 'recent', label: 'Recently edited' },
+  { value: 'title', label: 'Title A–Z' },
+  { value: 'lessons', label: 'Most lessons' },
+]
 
 function AddCourseForm() {
   const dispatch = useDispatch()
@@ -140,9 +149,14 @@ function AdminCourseCard({ course, menuOpen, onToggleMenu }) {
           <DotsIcon />
         </button>
       </div>
-      <span className={`${monoLabel} mt-2`}>
-        {course.lessons.length} Lesson{course.lessons.length === 1 ? '' : 's'}
-      </span>
+      <div className="mt-2.5 flex flex-wrap items-center gap-2">
+        <span className="border border-stone-300 px-2 py-0.5 font-mono text-[10px] font-medium tracking-[0.12em] text-stone-600 uppercase">
+          {course.category}
+        </span>
+        <span className={monoLabel}>
+          {course.lessons.length} Lesson{course.lessons.length === 1 ? '' : 's'}
+        </span>
+      </div>
 
       <div className="mt-auto flex items-center justify-between border-t border-stone-200 pt-4">
         <span className={monoLabel}>Last edited</span>
@@ -186,10 +200,78 @@ function AdminCourseCard({ course, menuOpen, onToggleMenu }) {
   )
 }
 
+function NewCourseCard({ onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label="Create new course"
+      className="flex min-h-56 flex-col border border-dashed border-stone-300 bg-white/60 p-6 text-left hover:border-stone-500 hover:bg-white"
+    >
+      <span className="flex size-9 items-center justify-center border border-stone-300 text-lg text-stone-500">
+        +
+      </span>
+      <span className="mt-3 text-[15px] font-bold tracking-tight text-stone-900">
+        New course
+      </span>
+      <span className={`${monoLabel} mt-auto`}>Add to catalog</span>
+    </button>
+  )
+}
+
 export default function AdminPage() {
   const courses = useSelector(selectCourses)
   const [showNewCourse, setShowNewCourse] = useState(false)
   const [menuFor, setMenuFor] = useState(null)
+
+  const [query, setQuery] = useState('')
+  const [category, setCategory] = useState('All')
+  const [sort, setSort] = useState('recent')
+  const [page, setPage] = useState(1)
+
+  // Any filter change returns to the first page so results stay in view.
+  const resetTo = (setter) => (value) => {
+    setter(value)
+    setPage(1)
+  }
+  const onQuery = (e) => resetTo(setQuery)(e.target.value)
+  const onCategory = resetTo(setCategory)
+  const onSort = (e) => resetTo(setSort)(e.target.value)
+
+  const clearFilters = () => {
+    setQuery('')
+    setCategory('All')
+    setSort('recent')
+    setPage(1)
+  }
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    const matched = courses.filter(
+      (c) =>
+        (category === 'All' || c.category === category) &&
+        (q === '' ||
+          c.title.toLowerCase().includes(q) ||
+          c.description.toLowerCase().includes(q)),
+    )
+    const sorted = [...matched]
+    if (sort === 'title') {
+      sorted.sort((a, b) => a.title.localeCompare(b.title))
+    } else if (sort === 'lessons') {
+      sorted.sort((a, b) => b.lessons.length - a.lessons.length)
+    } else {
+      sorted.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
+    }
+    return sorted
+  }, [courses, query, category, sort])
+
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const currentPage = Math.min(page, pageCount)
+  const visible = filtered.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE,
+  )
+  const hasFilters = query.trim() !== '' || category !== 'All'
 
   return (
     <div className="min-h-svh bg-[#f6f5f2]">
@@ -199,7 +281,7 @@ export default function AdminPage() {
         className="mx-auto w-full max-w-7xl px-8 py-10"
         onClick={() => menuFor && setMenuFor(null)}
       >
-        <div className="mb-10 flex flex-wrap items-start justify-between gap-4">
+        <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
           <div>
             <h1 className="text-4xl font-extrabold tracking-tight text-stone-900">
               Courses
@@ -217,30 +299,135 @@ export default function AdminPage() {
           </button>
         </div>
 
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {courses.map((course) => (
-            <AdminCourseCard
-              key={course.id}
-              course={course}
-              menuOpen={menuFor === course.id}
-              onToggleMenu={setMenuFor}
-            />
-          ))}
+        {/* Toolbar — search, category filter, sort */}
+        <div className="flex flex-col gap-4 border-y border-stone-200 py-5 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <label className="flex items-center gap-2.5 border border-stone-300 bg-white px-3.5 py-2.5 text-stone-400 focus-within:border-orange-600 sm:w-72">
+              <SearchIcon />
+              <input
+                type="search"
+                value={query}
+                onChange={onQuery}
+                placeholder="Search courses..."
+                className="w-full bg-transparent text-sm text-stone-900 outline-none placeholder:text-stone-400"
+              />
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {categories.map((c) => {
+                const active = c === category
+                return (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => onCategory(c)}
+                    className={`border px-3.5 py-2 font-mono text-xs font-medium tracking-[0.1em] uppercase transition-colors ${
+                      active
+                        ? 'border-stone-950 bg-stone-950 text-white'
+                        : 'border-stone-300 bg-white text-stone-600 hover:border-stone-500 hover:text-stone-900'
+                    }`}
+                  >
+                    {c}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
 
-          <button
-            type="button"
-            onClick={() => setShowNewCourse(true)}
-            aria-label="Create new course"
-            className="flex min-h-56 flex-col border border-stone-200 bg-white p-6 text-left hover:border-stone-400"
-          >
-            <span className="h-5 w-3/4 bg-stone-100" />
-            <span className="mt-3 h-3.5 w-2/5 bg-stone-100" />
-            <span className="mt-auto flex items-center justify-between border-t border-stone-100 pt-4">
-              <span className="h-3.5 w-1/3 bg-stone-100" />
-              <span className="h-3.5 w-1/4 bg-stone-100" />
+          <div className="relative shrink-0">
+            <select
+              value={sort}
+              onChange={onSort}
+              aria-label="Sort courses"
+              className="w-full cursor-pointer appearance-none border border-stone-300 bg-white py-2.5 pr-9 pl-3.5 font-mono text-xs font-medium tracking-[0.1em] text-stone-700 uppercase outline-none hover:border-stone-400 focus:border-orange-600"
+            >
+              {sortOptions.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+            <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-stone-500">
+              <ChevronIcon />
             </span>
-          </button>
+          </div>
         </div>
+
+        <p className={`${monoLabel} mt-5 mb-5`}>
+          {filtered.length} Course{filtered.length === 1 ? '' : 's'}
+          {hasFilters ? ' found' : ''}
+        </p>
+
+        {filtered.length === 0 ? (
+          <div className="flex min-h-56 flex-col items-center justify-center border border-dashed border-stone-300 bg-white/50 p-10 text-center">
+            <p className="text-lg font-bold text-stone-900">No courses found</p>
+            <p className="mt-1.5 text-sm text-stone-500">
+              Nothing matches your current search and filters.
+            </p>
+            <button
+              type="button"
+              onClick={clearFilters}
+              className={`${outlineButton} mt-5`}
+            >
+              Clear filters
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {visible.map((course) => (
+              <AdminCourseCard
+                key={course.id}
+                course={course}
+                menuOpen={menuFor === course.id}
+                onToggleMenu={setMenuFor}
+              />
+            ))}
+            {/* The create affordance lives at the natural end of the list. */}
+            {currentPage === pageCount && (
+              <NewCourseCard onClick={() => setShowNewCourse(true)} />
+            )}
+          </div>
+        )}
+
+        {pageCount > 1 && (
+          <nav
+            aria-label="Pagination"
+            className="mt-10 flex items-center justify-between border-t border-stone-200 pt-6"
+          >
+            <button
+              type="button"
+              disabled={currentPage === 1}
+              onClick={() => setPage(currentPage - 1)}
+              className="flex items-center gap-1.5 px-2 py-2 font-mono text-xs font-semibold tracking-[0.1em] text-stone-700 uppercase hover:text-stone-950 disabled:cursor-default disabled:opacity-30"
+            >
+              <ChevronIcon direction="left" /> Prev
+            </button>
+            <div className="flex gap-2">
+              {Array.from({ length: pageCount }, (_, i) => i + 1).map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => setPage(n)}
+                  aria-current={n === currentPage ? 'page' : undefined}
+                  className={`size-9 border font-mono text-xs font-semibold ${
+                    n === currentPage
+                      ? 'border-stone-950 bg-stone-950 text-white'
+                      : 'border-stone-300 bg-white text-stone-700 hover:border-stone-500'
+                  }`}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              disabled={currentPage === pageCount}
+              onClick={() => setPage(currentPage + 1)}
+              className="flex items-center gap-1.5 px-2 py-2 font-mono text-xs font-semibold tracking-[0.1em] text-stone-700 uppercase hover:text-stone-950 disabled:cursor-default disabled:opacity-30"
+            >
+              Next <ChevronIcon direction="right" />
+            </button>
+          </nav>
+        )}
       </main>
 
       {showNewCourse && (
