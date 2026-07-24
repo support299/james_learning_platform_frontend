@@ -1,13 +1,12 @@
 import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { useDispatch, useSelector } from 'react-redux'
-import { firstLessonPath, categories } from '../data/courses.js'
+import { firstLessonPath } from '../data/courses.js'
 import {
-  addCourse,
-  deleteCourse,
-  selectCourses,
-} from '../store/coursesSlice.js'
-import { slugify, uniqueSlug, formatDate } from '../utils/adminHelpers.js'
+  useGetCoursesQuery,
+  useCreateCourseMutation,
+  useDeleteCourseMutation,
+} from '../store/coursesApi.js'
+import { formatDate } from '../utils/adminHelpers.js'
 import CourseCard from '../components/CourseCard.jsx'
 import SiteHeader from '../components/SiteHeader.jsx'
 import { DotsIcon, SearchIcon, ChevronIcon } from '../components/Icons.jsx'
@@ -19,7 +18,6 @@ import {
   monoLabel,
   blackButton,
   outlineButton,
-  courseCategories,
 } from '../components/adminUi.jsx'
 
 const PAGE_SIZE = 6
@@ -30,18 +28,16 @@ const sortOptions = [
   { value: 'lessons', label: 'Most lessons' },
 ]
 
-function AddCourseForm() {
-  const dispatch = useDispatch()
+function AddCourseForm({ onDone }) {
   const navigate = useNavigate()
-  const courses = useSelector(selectCourses)
+  const [createCourse, { isLoading }] = useCreateCourseMutation()
   const [title, setTitle] = useState('')
-  const [category, setCategory] = useState('Design')
   const [description, setDescription] = useState('')
+  const [error, setError] = useState(null)
 
   const draft = {
     id: 'preview',
     title: title.trim() || 'Course Title',
-    category,
     description:
       description.trim() || 'A short description of what this course covers.',
     rating: 0,
@@ -51,25 +47,22 @@ function AddCourseForm() {
     lessons: [],
   }
 
-  const canSubmit = title.trim() !== '' && description.trim() !== ''
+  const canSubmit = title.trim() !== '' && description.trim() !== '' && !isLoading
 
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault()
-    const id = uniqueSlug(
-      slugify(title),
-      courses.map((c) => c.id),
-    )
-    dispatch(
-      addCourse({
-        id,
+    setError(null)
+    try {
+      const created = await createCourse({
         title: title.trim(),
-        category,
         description: description.trim(),
-        updatedAt: new Date().toISOString(),
-      }),
-    )
-    // Take the author straight into the new course to add and arrange lessons.
-    navigate(`/admin/course/${id}`)
+      }).unwrap()
+      onDone?.()
+      // Take the author straight into the new course to add and arrange lessons.
+      navigate(`/admin/course/${created.id}`)
+    } catch {
+      setError('Could not create the course. Is the API running?')
+    }
   }
 
   return (
@@ -84,17 +77,6 @@ function AddCourseForm() {
             className={inputClass}
           />
         </Field>
-        <Field label="Category">
-          <select
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-            className={inputClass}
-          >
-            {courseCategories.map((c) => (
-              <option key={c}>{c}</option>
-            ))}
-          </select>
-        </Field>
         <Field label="Description">
           <textarea
             value={description}
@@ -104,8 +86,9 @@ function AddCourseForm() {
             className={inputClass}
           />
         </Field>
+        {error && <p className="text-sm font-medium text-red-600">{error}</p>}
         <button type="submit" disabled={!canSubmit} className={blackButton}>
-          + Create & Add Lessons
+          {isLoading ? 'Creating…' : '+ Create & Add Lessons'}
         </button>
       </form>
 
@@ -120,13 +103,14 @@ function AddCourseForm() {
 }
 
 function AdminCourseCard({ course, menuOpen, onToggleMenu }) {
-  const dispatch = useDispatch()
+  const [deleteCourse] = useDeleteCourseMutation()
   const lessonPath = firstLessonPath(course)
   const editPath = `/admin/course/${course.id}`
+  const lessonCount = course.lessons?.length ?? course.lessonCount ?? 0
 
-  const remove = () => {
+  const remove = async () => {
     if (window.confirm(`Delete "${course.title}" and all its lessons?`)) {
-      dispatch(deleteCourse(course.id))
+      await deleteCourse(course.id)
     }
     onToggleMenu(null)
   }
@@ -150,11 +134,8 @@ function AdminCourseCard({ course, menuOpen, onToggleMenu }) {
         </button>
       </div>
       <div className="mt-2.5 flex flex-wrap items-center gap-2">
-        <span className="border border-stone-300 px-2 py-0.5 font-mono text-[10px] font-medium tracking-[0.12em] text-stone-600 uppercase">
-          {course.category}
-        </span>
         <span className={monoLabel}>
-          {course.lessons.length} Lesson{course.lessons.length === 1 ? '' : 's'}
+          {lessonCount} Lesson{lessonCount === 1 ? '' : 's'}
         </span>
       </div>
 
@@ -220,27 +201,27 @@ function NewCourseCard({ onClick }) {
 }
 
 export default function AdminPage() {
-  const courses = useSelector(selectCourses)
+  const { data: courses = [], isLoading, isError, refetch } =
+    useGetCoursesQuery()
   const [showNewCourse, setShowNewCourse] = useState(false)
   const [menuFor, setMenuFor] = useState(null)
 
   const [query, setQuery] = useState('')
-  const [category, setCategory] = useState('All')
   const [sort, setSort] = useState('recent')
   const [page, setPage] = useState(1)
 
   // Any filter change returns to the first page so results stay in view.
-  const resetTo = (setter) => (value) => {
-    setter(value)
+  const onQuery = (e) => {
+    setQuery(e.target.value)
     setPage(1)
   }
-  const onQuery = (e) => resetTo(setQuery)(e.target.value)
-  const onCategory = resetTo(setCategory)
-  const onSort = (e) => resetTo(setSort)(e.target.value)
+  const onSort = (e) => {
+    setSort(e.target.value)
+    setPage(1)
+  }
 
   const clearFilters = () => {
     setQuery('')
-    setCategory('All')
     setSort('recent')
     setPage(1)
   }
@@ -249,21 +230,21 @@ export default function AdminPage() {
     const q = query.trim().toLowerCase()
     const matched = courses.filter(
       (c) =>
-        (category === 'All' || c.category === category) &&
-        (q === '' ||
-          c.title.toLowerCase().includes(q) ||
-          c.description.toLowerCase().includes(q)),
+        q === '' ||
+        c.title.toLowerCase().includes(q) ||
+        (c.description ?? '').toLowerCase().includes(q),
     )
+    const lessonsOf = (c) => c.lessons?.length ?? c.lessonCount ?? 0
     const sorted = [...matched]
     if (sort === 'title') {
       sorted.sort((a, b) => a.title.localeCompare(b.title))
     } else if (sort === 'lessons') {
-      sorted.sort((a, b) => b.lessons.length - a.lessons.length)
+      sorted.sort((a, b) => lessonsOf(b) - lessonsOf(a))
     } else {
       sorted.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
     }
     return sorted
-  }, [courses, query, category, sort])
+  }, [courses, query, sort])
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const currentPage = Math.min(page, pageCount)
@@ -271,7 +252,7 @@ export default function AdminPage() {
     (currentPage - 1) * PAGE_SIZE,
     currentPage * PAGE_SIZE,
   )
-  const hasFilters = query.trim() !== '' || category !== 'All'
+  const hasFilters = query.trim() !== ''
 
   return (
     <div className="min-h-svh bg-[#f6f5f2]">
@@ -299,39 +280,18 @@ export default function AdminPage() {
           </button>
         </div>
 
-        {/* Toolbar — search, category filter, sort */}
+        {/* Toolbar — search + sort */}
         <div className="flex flex-col gap-4 border-y border-stone-200 py-5 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <label className="flex items-center gap-2.5 border border-stone-300 bg-white px-3.5 py-2.5 text-stone-400 focus-within:border-orange-600 sm:w-72">
-              <SearchIcon />
-              <input
-                type="search"
-                value={query}
-                onChange={onQuery}
-                placeholder="Search courses..."
-                className="w-full bg-transparent text-sm text-stone-900 outline-none placeholder:text-stone-400"
-              />
-            </label>
-            <div className="flex flex-wrap gap-2">
-              {categories.map((c) => {
-                const active = c === category
-                return (
-                  <button
-                    key={c}
-                    type="button"
-                    onClick={() => onCategory(c)}
-                    className={`border px-3.5 py-2 font-mono text-xs font-medium tracking-[0.1em] uppercase transition-colors ${
-                      active
-                        ? 'border-stone-950 bg-stone-950 text-white'
-                        : 'border-stone-300 bg-white text-stone-600 hover:border-stone-500 hover:text-stone-900'
-                    }`}
-                  >
-                    {c}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
+          <label className="flex items-center gap-2.5 border border-stone-300 bg-white px-3.5 py-2.5 text-stone-400 focus-within:border-orange-600 sm:w-72">
+            <SearchIcon />
+            <input
+              type="search"
+              value={query}
+              onChange={onQuery}
+              placeholder="Search courses..."
+              className="w-full bg-transparent text-sm text-stone-900 outline-none placeholder:text-stone-400"
+            />
+          </label>
 
           <div className="relative shrink-0">
             <select
@@ -357,19 +317,51 @@ export default function AdminPage() {
           {hasFilters ? ' found' : ''}
         </p>
 
-        {filtered.length === 0 ? (
-          <div className="flex min-h-56 flex-col items-center justify-center border border-dashed border-stone-300 bg-white/50 p-10 text-center">
-            <p className="text-lg font-bold text-stone-900">No courses found</p>
+        {isLoading ? (
+          <div className="flex min-h-56 items-center justify-center border border-dashed border-stone-300 bg-white/50 p-10 text-center">
+            <p className="text-sm text-stone-500">Loading courses…</p>
+          </div>
+        ) : isError ? (
+          <div className="flex min-h-56 flex-col items-center justify-center border border-dashed border-red-300 bg-red-50/50 p-10 text-center">
+            <p className="text-lg font-bold text-stone-900">
+              Couldn’t reach the API
+            </p>
             <p className="mt-1.5 text-sm text-stone-500">
-              Nothing matches your current search and filters.
+              Make sure the Django server is running on port 8000.
             </p>
             <button
               type="button"
-              onClick={clearFilters}
+              onClick={() => refetch()}
               className={`${outlineButton} mt-5`}
             >
-              Clear filters
+              Retry
             </button>
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="flex min-h-56 flex-col items-center justify-center border border-dashed border-stone-300 bg-white/50 p-10 text-center">
+            <p className="text-lg font-bold text-stone-900">No courses found</p>
+            <p className="mt-1.5 text-sm text-stone-500">
+              {hasFilters
+                ? 'Nothing matches your current search.'
+                : 'Create your first course to get started.'}
+            </p>
+            {hasFilters ? (
+              <button
+                type="button"
+                onClick={clearFilters}
+                className={`${outlineButton} mt-5`}
+              >
+                Clear filters
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setShowNewCourse(true)}
+                className={`${blackButton} mt-5`}
+              >
+                + New Course
+              </button>
+            )}
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
@@ -432,7 +424,7 @@ export default function AdminPage() {
 
       {showNewCourse && (
         <Modal title="New Course" onClose={() => setShowNewCourse(false)}>
-          <AddCourseForm />
+          <AddCourseForm onDone={() => setShowNewCourse(false)} />
         </Modal>
       )}
     </div>

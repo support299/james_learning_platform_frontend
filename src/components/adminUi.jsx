@@ -1,4 +1,3 @@
-import { categories } from '../data/courses.js'
 import { CloseIcon } from './Icons.jsx'
 
 export const inputClass =
@@ -9,8 +8,6 @@ export const blackButton =
   'bg-stone-950 px-6 py-3 font-mono text-xs font-semibold tracking-[0.15em] text-white uppercase hover:bg-stone-800 disabled:cursor-default disabled:opacity-40'
 export const outlineButton =
   'border border-stone-300 bg-white px-6 py-3 font-mono text-xs font-semibold tracking-[0.15em] text-stone-800 uppercase hover:bg-stone-100'
-
-export const courseCategories = categories.filter((c) => c !== 'All')
 
 export function Field({ label, children }) {
   return (

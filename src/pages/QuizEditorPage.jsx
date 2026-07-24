@@ -1,12 +1,11 @@
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { useDispatch, useSelector } from 'react-redux'
 import {
-  selectCourseById,
-  addLesson,
-  updateLesson,
-} from '../store/coursesSlice.js'
-import { slugify, uniqueSlug } from '../utils/adminHelpers.js'
+  useGetCourseQuery,
+  useGetLessonQuery,
+  useCreateLessonMutation,
+  useUpdateLessonMutation,
+} from '../store/coursesApi.js'
 import SiteHeader from '../components/SiteHeader.jsx'
 import { Field, inputClass, monoLabel } from '../components/adminUi.jsx'
 import { ArrowIcon, PlusIcon, TrashIcon } from '../components/Icons.jsx'
@@ -42,7 +41,7 @@ function isComplete(question) {
   )
 }
 
-function NotFound({ children }) {
+function Notice({ children }) {
   return (
     <div className="min-h-svh bg-[#f6f5f2]">
       <SiteHeader />
@@ -153,22 +152,26 @@ function QuestionCard({ question, index, total, onChange, onRemove }) {
 }
 
 function QuizEditor({ course, lesson }) {
-  const dispatch = useDispatch()
   const navigate = useNavigate()
+  const [createLesson, { isLoading: creating }] = useCreateLessonMutation()
+  const [updateLesson, { isLoading: updating }] = useUpdateLessonMutation()
   const isEdit = Boolean(lesson)
   const backTo = `/admin/course/${course.id}`
 
   const [title, setTitle] = useState(lesson?.title ?? '')
   const [overview, setOverview] = useState(lesson?.overview ?? '')
   const [questions, setQuestions] = useState(() => seedQuestions(lesson))
+  const [error, setError] = useState(null)
 
-  const canSave = title.trim() !== '' && questions.every(isComplete)
+  const saving = creating || updating
+  const canSave = title.trim() !== '' && questions.every(isComplete) && !saving
 
   const updateQuestion = (index, next) =>
     setQuestions((qs) => qs.map((q, i) => (i === index ? next : q)))
 
-  const save = () => {
+  const save = async () => {
     if (!canSave) return
+    setError(null)
     const cleaned = questions.map(({ prompt, options, answer }) => {
       const kept = options.filter((o) => o.trim() !== '')
       return {
@@ -182,28 +185,23 @@ function QuizEditor({ course, lesson }) {
       title: title.trim(),
       type: 'quiz',
       questions: cleaned,
-      questionCount: cleaned.length,
       meta: `${cleaned.length} Question${cleaned.length === 1 ? '' : 's'}`,
-      ...(overview.trim() && { overview: overview.trim() }),
+      overview: overview.trim(),
     }
-    if (isEdit) {
-      dispatch(
-        updateLesson({ courseId: course.id, lessonId: lesson.id, lesson: data }),
-      )
-    } else {
-      const id = uniqueSlug(
-        slugify(title),
-        course.lessons.map((l) => l.id),
-      )
-      dispatch(
-        addLesson({
+    try {
+      if (isEdit) {
+        await updateLesson({
           courseId: course.id,
-          lesson: { id, ...data },
-          updatedAt: new Date().toISOString(),
-        }),
-      )
+          lessonId: lesson.id,
+          lesson: data,
+        }).unwrap()
+      } else {
+        await createLesson({ courseId: course.id, lesson: data }).unwrap()
+      }
+      navigate(backTo)
+    } catch {
+      setError('Could not save the quiz. Is the API running?')
     }
-    navigate(backTo)
   }
 
   return (
@@ -230,6 +228,11 @@ function QuizEditor({ course, lesson }) {
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-2">
+            {error && (
+              <span className="hidden text-sm font-medium text-red-600 sm:inline">
+                {error}
+              </span>
+            )}
             <button
               type="button"
               onClick={() => navigate(backTo)}
@@ -243,7 +246,7 @@ function QuizEditor({ course, lesson }) {
               disabled={!canSave}
               className="rounded-lg bg-stone-950 px-5 py-2 text-sm font-semibold text-white hover:bg-stone-800 disabled:cursor-default disabled:opacity-40"
             >
-              {isEdit ? 'Save changes' : 'Create quiz'}
+              {saving ? 'Saving…' : isEdit ? 'Save changes' : 'Create quiz'}
             </button>
           </div>
         </div>
@@ -314,12 +317,21 @@ function QuizEditor({ course, lesson }) {
 
 export default function QuizEditorPage() {
   const { courseId, lessonId } = useParams()
-  const course = useSelector((state) => selectCourseById(state, courseId))
+  const { data: course, isLoading: courseLoading, isError: courseError } =
+    useGetCourseQuery(courseId)
+  const {
+    data: lesson,
+    isLoading: lessonLoading,
+    isError: lessonError,
+  } = useGetLessonQuery({ courseId, lessonId }, { skip: !lessonId })
 
-  if (!course) return <NotFound>Course not found</NotFound>
+  if (courseLoading || (lessonId && lessonLoading)) {
+    return <Notice>Loading…</Notice>
+  }
+  if (courseError || !course) return <Notice>Course not found</Notice>
+  if (lessonId && (lessonError || !lesson)) return <Notice>Quiz not found</Notice>
 
-  const lesson = lessonId ? course.lessons.find((l) => l.id === lessonId) : null
-  if (lessonId && !lesson) return <NotFound>Quiz not found</NotFound>
-
-  return <QuizEditor key={lessonId ?? 'new'} course={course} lesson={lesson} />
+  return (
+    <QuizEditor key={lessonId ?? 'new'} course={course} lesson={lesson ?? null} />
+  )
 }

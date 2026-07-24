@@ -1,12 +1,11 @@
 import { useState, lazy, Suspense } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { useDispatch, useSelector } from 'react-redux'
 import {
-  selectCourseById,
-  addLesson,
-  updateLesson,
-} from '../store/coursesSlice.js'
-import { slugify, uniqueSlug } from '../utils/adminHelpers.js'
+  useGetCourseQuery,
+  useGetLessonQuery,
+  useCreateLessonMutation,
+  useUpdateLessonMutation,
+} from '../store/coursesApi.js'
 import { lessonToHtml } from '../utils/lessonHtml.js'
 import SiteHeader from '../components/SiteHeader.jsx'
 import { Field, inputClass } from '../components/adminUi.jsx'
@@ -14,7 +13,7 @@ import { ArrowIcon } from '../components/Icons.jsx'
 
 const RichTextEditor = lazy(() => import('../components/RichTextEditor.jsx'))
 
-function NotFound({ children }) {
+function Notice({ children }) {
   return (
     <div className="min-h-svh bg-[#f6f5f2]">
       <SiteHeader />
@@ -32,8 +31,9 @@ function NotFound({ children }) {
 }
 
 function LessonEditor({ course, lesson }) {
-  const dispatch = useDispatch()
   const navigate = useNavigate()
+  const [createLesson, { isLoading: creating }] = useCreateLessonMutation()
+  const [updateLesson, { isLoading: updating }] = useUpdateLessonMutation()
   const isEdit = Boolean(lesson)
   const backTo = `/admin/course/${course.id}`
 
@@ -41,36 +41,35 @@ function LessonEditor({ course, lesson }) {
   const [duration, setDuration] = useState(lesson?.duration ?? '')
   const [overview, setOverview] = useState(lesson?.overview ?? '')
   const [content, setContent] = useState(() => lessonToHtml(lesson))
+  const [error, setError] = useState(null)
 
-  const canSave = title.trim() !== '' && content.trim() !== ''
+  const saving = creating || updating
+  const canSave = title.trim() !== '' && content.trim() !== '' && !saving
 
-  const save = () => {
+  const save = async () => {
     if (!canSave) return
+    setError(null)
     const data = {
       title: title.trim(),
       type: 'text',
       html: content,
-      ...(duration.trim() && { duration: duration.trim() }),
-      ...(overview.trim() && { overview: overview.trim() }),
+      duration: duration.trim(),
+      overview: overview.trim(),
     }
-    if (isEdit) {
-      dispatch(
-        updateLesson({ courseId: course.id, lessonId: lesson.id, lesson: data }),
-      )
-    } else {
-      const id = uniqueSlug(
-        slugify(title),
-        course.lessons.map((l) => l.id),
-      )
-      dispatch(
-        addLesson({
+    try {
+      if (isEdit) {
+        await updateLesson({
           courseId: course.id,
-          lesson: { id, ...data },
-          updatedAt: new Date().toISOString(),
-        }),
-      )
+          lessonId: lesson.id,
+          lesson: data,
+        }).unwrap()
+      } else {
+        await createLesson({ courseId: course.id, lesson: data }).unwrap()
+      }
+      navigate(backTo)
+    } catch {
+      setError('Could not save the lesson. Is the API running?')
     }
-    navigate(backTo)
   }
 
   return (
@@ -97,6 +96,11 @@ function LessonEditor({ course, lesson }) {
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-2">
+            {error && (
+              <span className="hidden text-sm font-medium text-red-600 sm:inline">
+                {error}
+              </span>
+            )}
             <button
               type="button"
               onClick={() => navigate(backTo)}
@@ -110,7 +114,7 @@ function LessonEditor({ course, lesson }) {
               disabled={!canSave}
               className="rounded-lg bg-stone-950 px-5 py-2 text-sm font-semibold text-white hover:bg-stone-800 disabled:cursor-default disabled:opacity-40"
             >
-              {isEdit ? 'Save changes' : 'Create lesson'}
+              {saving ? 'Saving…' : isEdit ? 'Save changes' : 'Create lesson'}
             </button>
           </div>
         </div>
@@ -167,15 +171,25 @@ function LessonEditor({ course, lesson }) {
 
 export default function LessonEditorPage() {
   const { courseId, lessonId } = useParams()
-  const course = useSelector((state) => selectCourseById(state, courseId))
+  const { data: course, isLoading: courseLoading, isError: courseError } =
+    useGetCourseQuery(courseId)
+  const {
+    data: lesson,
+    isLoading: lessonLoading,
+    isError: lessonError,
+  } = useGetLessonQuery(
+    { courseId, lessonId },
+    { skip: !lessonId },
+  )
 
-  if (!course) return <NotFound>Course not found</NotFound>
-
-  const lesson = lessonId
-    ? course.lessons.find((l) => l.id === lessonId)
-    : null
-  if (lessonId && !lesson) return <NotFound>Lesson not found</NotFound>
+  if (courseLoading || (lessonId && lessonLoading)) {
+    return <Notice>Loading…</Notice>
+  }
+  if (courseError || !course) return <Notice>Course not found</Notice>
+  if (lessonId && (lessonError || !lesson)) return <Notice>Lesson not found</Notice>
 
   // Key on the lesson so switching between lessons re-seeds the form state.
-  return <LessonEditor key={lessonId ?? 'new'} course={course} lesson={lesson} />
+  return (
+    <LessonEditor key={lessonId ?? 'new'} course={course} lesson={lesson ?? null} />
+  )
 }

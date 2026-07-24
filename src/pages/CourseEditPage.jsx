@@ -1,12 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { useDispatch, useSelector } from 'react-redux'
 import {
-  selectCourseById,
-  updateCourse,
-  reorderLessons,
-  deleteLesson,
-} from '../store/coursesSlice.js'
+  useGetCourseQuery,
+  useUpdateCourseMutation,
+  useReorderLessonsMutation,
+  useDeleteLessonMutation,
+} from '../store/coursesApi.js'
 import { firstLessonPath } from '../data/courses.js'
 import SiteHeader from '../components/SiteHeader.jsx'
 import {
@@ -15,7 +14,6 @@ import {
   blackButton,
   outlineButton,
   monoLabel,
-  courseCategories,
 } from '../components/adminUi.jsx'
 import {
   ChevronIcon,
@@ -41,30 +39,40 @@ function lessonMeta(lesson) {
   return lesson.meta ?? `${lesson.questionCount ?? 0} Questions`
 }
 
+function Shell({ children }) {
+  return (
+    <div className="min-h-svh bg-[#f6f5f2]">
+      <SiteHeader />
+      <main className="mx-auto w-full max-w-4xl px-8 py-10">{children}</main>
+    </div>
+  )
+}
+
 function CourseDetailsForm({ course }) {
-  const dispatch = useDispatch()
+  const [updateCourse, { isLoading }] = useUpdateCourseMutation()
   const [title, setTitle] = useState(course.title)
-  const [category, setCategory] = useState(course.category)
-  const [description, setDescription] = useState(course.description)
+  const [description, setDescription] = useState(course.description ?? '')
   const [saved, setSaved] = useState(false)
+  const [error, setError] = useState(null)
 
   const dirty =
     title.trim() !== course.title ||
-    category !== course.category ||
-    description.trim() !== course.description
-  const canSave = title.trim() !== '' && description.trim() !== '' && dirty
+    description.trim() !== (course.description ?? '')
+  const canSave = title.trim() !== '' && dirty && !isLoading
 
-  const save = (e) => {
+  const save = async (e) => {
     e.preventDefault()
-    dispatch(
-      updateCourse({
-        courseId: course.id,
+    setError(null)
+    try {
+      await updateCourse({
+        id: course.id,
         title: title.trim(),
-        category,
         description: description.trim(),
-      }),
-    )
-    setSaved(true)
+      }).unwrap()
+      setSaved(true)
+    } catch {
+      setError('Could not save. Is the API running?')
+    }
   }
 
   return (
@@ -73,27 +81,14 @@ function CourseDetailsForm({ course }) {
       onChange={() => setSaved(false)}
       className="space-y-5 border border-stone-200 bg-white p-6"
     >
-      <div className="grid gap-5 sm:grid-cols-2">
-        <Field label="Course Title">
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            className={inputClass}
-          />
-        </Field>
-        <Field label="Category">
-          <select
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-            className={inputClass}
-          >
-            {courseCategories.map((c) => (
-              <option key={c}>{c}</option>
-            ))}
-          </select>
-        </Field>
-      </div>
+      <Field label="Course Title">
+        <input
+          type="text"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          className={inputClass}
+        />
+      </Field>
       <Field label="Description">
         <textarea
           value={description}
@@ -104,11 +99,12 @@ function CourseDetailsForm({ course }) {
       </Field>
       <div className="flex items-center gap-4">
         <button type="submit" disabled={!canSave} className={blackButton}>
-          Save changes
+          {isLoading ? 'Saving…' : 'Save changes'}
         </button>
         {saved && !dirty && (
           <span className="text-sm font-medium text-emerald-700">Saved.</span>
         )}
+        {error && <span className="text-sm font-medium text-red-600">{error}</span>}
       </div>
     </form>
   )
@@ -127,7 +123,7 @@ function LessonRow({
   onDragEnd,
   onMove,
 }) {
-  const dispatch = useDispatch()
+  const [deleteLesson] = useDeleteLessonMutation()
   const isQuiz = lesson.type === 'quiz'
   const editPath = isQuiz
     ? `/admin/course/${course.id}/quiz/${lesson.id}/edit`
@@ -135,7 +131,7 @@ function LessonRow({
 
   const remove = () => {
     if (window.confirm(`Delete ${isQuiz ? 'quiz' : 'lesson'} "${lesson.title}"?`)) {
-      dispatch(deleteLesson({ courseId: course.id, lessonId: lesson.id }))
+      deleteLesson({ courseId: course.id, lessonId: lesson.id })
     }
   }
 
@@ -219,94 +215,131 @@ function LessonRow({
 
 export default function CourseEditPage() {
   const { courseId } = useParams()
-  const dispatch = useDispatch()
   const navigate = useNavigate()
-  const course = useSelector((state) => selectCourseById(state, courseId))
+  const { data: course, isLoading, isError } = useGetCourseQuery(courseId)
+  const [reorderLessons] = useReorderLessonsMutation()
+
+  // Local copy of the lesson order for instant drag feedback; re-synced
+  // whenever the server data changes (after add/delete/reorder).
+  const [lessons, setLessons] = useState([])
   const [dragIndex, setDragIndex] = useState(null)
   const [overIndex, setOverIndex] = useState(null)
 
-  if (!course) {
+  useEffect(() => {
+    if (course) setLessons(course.lessons)
+  }, [course])
+
+  if (isLoading) {
     return (
-      <div className="min-h-svh bg-[#f6f5f2]">
-        <SiteHeader />
-        <main className="mx-auto w-full max-w-7xl px-8 py-20 text-center">
-          <h1 className="text-2xl font-bold text-stone-900">
-            Course not found
-          </h1>
+      <Shell>
+        <p className="py-20 text-center text-stone-500">Loading course…</p>
+      </Shell>
+    )
+  }
+
+  if (isError || !course) {
+    return (
+      <Shell>
+        <div className="py-20 text-center">
+          <h1 className="text-2xl font-bold text-stone-900">Course not found</h1>
           <Link
             to="/admin"
             className="mt-4 inline-block text-sm font-semibold text-orange-600 underline"
           >
             Back to courses
           </Link>
-        </main>
-      </div>
+        </div>
+      </Shell>
     )
   }
 
+  const persistOrder = (next) => {
+    setLessons(next)
+    reorderLessons({ courseId: course.id, lessonIds: next.map((l) => l.id) })
+  }
+
   const move = (from, to) => {
-    if (to < 0 || to >= course.lessons.length) return
-    dispatch(reorderLessons({ courseId: course.id, from, to }))
+    if (to < 0 || to >= lessons.length) return
+    const next = [...lessons]
+    const [moved] = next.splice(from, 1)
+    next.splice(to, 0, moved)
+    persistOrder(next)
   }
 
   const handleDrop = (targetIndex) => {
-    if (dragIndex !== null) move(dragIndex, targetIndex)
+    if (dragIndex !== null && dragIndex !== targetIndex) move(dragIndex, targetIndex)
     setDragIndex(null)
     setOverIndex(null)
   }
 
-  const studentPath = firstLessonPath(course)
+  const studentPath = firstLessonPath({ ...course, lessons })
   const newLessonPath = `/admin/course/${course.id}/lesson/new`
   const newQuizPath = `/admin/course/${course.id}/quiz/new`
 
   return (
-    <div className="min-h-svh bg-[#f6f5f2]">
-      <SiteHeader />
+    <Shell>
+      <Link
+        to="/admin"
+        className="inline-flex items-center gap-1.5 text-sm font-medium text-stone-500 hover:text-stone-900"
+      >
+        <ArrowIcon direction="left" size={15} /> All courses
+      </Link>
 
-      <main className="mx-auto w-full max-w-4xl px-8 py-10">
-        <Link
-          to="/admin"
-          className="inline-flex items-center gap-1.5 text-sm font-medium text-stone-500 hover:text-stone-900"
-        >
-          <ArrowIcon direction="left" size={15} /> All courses
-        </Link>
-
-        <div className="mt-4 mb-8 flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h1 className="text-4xl font-extrabold tracking-tight text-stone-900">
-              {course.title}
-            </h1>
-            <p className="mt-1.5 text-stone-500">
-              Edit course details and organize its lessons.
-            </p>
-          </div>
-          {studentPath && (
-            <Link
-              to={studentPath}
-              className="border border-stone-300 bg-white px-5 py-3 font-mono text-xs font-semibold tracking-[0.15em] text-stone-800 uppercase hover:bg-stone-100"
-            >
-              View as student
-            </Link>
-          )}
+      <div className="mt-4 mb-8 flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-4xl font-extrabold tracking-tight text-stone-900">
+            {course.title}
+          </h1>
+          <p className="mt-1.5 text-stone-500">
+            Edit course details and organize its lessons.
+          </p>
         </div>
+        {studentPath && (
+          <Link
+            to={studentPath}
+            className="border border-stone-300 bg-white px-5 py-3 font-mono text-xs font-semibold tracking-[0.15em] text-stone-800 uppercase hover:bg-stone-100"
+          >
+            View as student
+          </Link>
+        )}
+      </div>
 
-        <CourseDetailsForm course={course} />
+      <CourseDetailsForm course={course} />
 
-        <div className="mt-10 mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-bold text-stone-900">
-            Lessons{' '}
-            <span className="font-mono text-sm font-normal text-stone-400">
-              ({course.lessons.length})
-            </span>
-          </h2>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => navigate(newQuizPath)}
-              className={outlineButton}
-            >
-              + Add Quiz
-            </button>
+      <div className="mt-10 mb-4 flex items-center justify-between">
+        <h2 className="text-lg font-bold text-stone-900">
+          Lessons{' '}
+          <span className="font-mono text-sm font-normal text-stone-400">
+            ({lessons.length})
+          </span>
+        </h2>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => navigate(newQuizPath)}
+            className={outlineButton}
+          >
+            + Add Quiz
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate(newLessonPath)}
+            className={blackButton}
+          >
+            + Add Lesson
+          </button>
+        </div>
+      </div>
+
+      {lessons.length === 0 ? (
+        <div className="flex w-full flex-col items-center justify-center gap-2 border border-dashed border-stone-300 bg-white/60 px-6 py-14 text-center">
+          <span className="text-sm font-semibold text-stone-700">
+            No lessons yet
+          </span>
+          <span className="text-sm text-stone-500">
+            Add your first lesson or quiz to get started.
+          </span>
+          <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
             <button
               type="button"
               onClick={() => navigate(newLessonPath)}
@@ -314,61 +347,41 @@ export default function CourseEditPage() {
             >
               + Add Lesson
             </button>
+            <button
+              type="button"
+              onClick={() => navigate(newQuizPath)}
+              className={outlineButton}
+            >
+              + Add Quiz
+            </button>
           </div>
         </div>
-
-        {course.lessons.length === 0 ? (
-          <div className="flex w-full flex-col items-center justify-center gap-2 border border-dashed border-stone-300 bg-white/60 px-6 py-14 text-center">
-            <span className="text-sm font-semibold text-stone-700">
-              No lessons yet
-            </span>
-            <span className="text-sm text-stone-500">
-              Add your first lesson or quiz to get started.
-            </span>
-            <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
-              <button
-                type="button"
-                onClick={() => navigate(newLessonPath)}
-                className={blackButton}
-              >
-                + Add Lesson
-              </button>
-              <button
-                type="button"
-                onClick={() => navigate(newQuizPath)}
-                className={outlineButton}
-              >
-                + Add Quiz
-              </button>
-            </div>
-          </div>
-        ) : (
-          <>
-            <p className={`${monoLabel} mb-3`}>Drag to reorder</p>
-            <ul className="space-y-2">
-              {course.lessons.map((lesson, index) => (
-                <LessonRow
-                  key={lesson.id}
-                  course={course}
-                  lesson={lesson}
-                  index={index}
-                  total={course.lessons.length}
-                  isDragging={dragIndex === index}
-                  isOver={overIndex === index && dragIndex !== index}
-                  onDragStart={() => setDragIndex(index)}
-                  onDragEnter={() => setOverIndex(index)}
-                  onDrop={() => handleDrop(index)}
-                  onDragEnd={() => {
-                    setDragIndex(null)
-                    setOverIndex(null)
-                  }}
-                  onMove={(to) => move(index, to)}
-                />
-              ))}
-            </ul>
-          </>
-        )}
-      </main>
-    </div>
+      ) : (
+        <>
+          <p className={`${monoLabel} mb-3`}>Drag to reorder</p>
+          <ul className="space-y-2">
+            {lessons.map((lesson, index) => (
+              <LessonRow
+                key={lesson.id}
+                course={course}
+                lesson={lesson}
+                index={index}
+                total={lessons.length}
+                isDragging={dragIndex === index}
+                isOver={overIndex === index && dragIndex !== index}
+                onDragStart={() => setDragIndex(index)}
+                onDragEnter={() => setOverIndex(index)}
+                onDrop={() => handleDrop(index)}
+                onDragEnd={() => {
+                  setDragIndex(null)
+                  setOverIndex(null)
+                }}
+                onMove={(to) => move(index, to)}
+              />
+            ))}
+          </ul>
+        </>
+      )}
+    </Shell>
   )
 }

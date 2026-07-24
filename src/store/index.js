@@ -1,12 +1,16 @@
 import { configureStore } from '@reduxjs/toolkit'
 import coursesReducer, { STORAGE_KEY } from './coursesSlice.js'
 import filtersReducer from './filtersSlice.js'
+import { coursesApi } from './coursesApi.js'
 
 export const store = configureStore({
   reducer: {
     courses: coursesReducer,
     filters: filtersReducer,
+    [coursesApi.reducerPath]: coursesApi.reducer,
   },
+  middleware: (getDefaultMiddleware) =>
+    getDefaultMiddleware().concat(coursesApi.middleware),
 })
 
 let lastList = store.getState().courses.list

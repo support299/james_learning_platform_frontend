@@ -25,11 +25,13 @@ export default function CourseCard({ course }) {
   return (
     <article className="flex flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition-shadow hover:shadow-md">
       <div
-        className={`relative h-42 ${bannerByCategory[course.category.toLowerCase()] ?? bannerByCategory.design}`}
+        className={`relative h-42 ${bannerByCategory[course.category?.toLowerCase()] ?? bannerByCategory.design}`}
       >
-        <span className="absolute top-3.5 left-3.5 rounded-full bg-white/95 px-3 py-1 text-xs font-semibold text-gray-900">
-          {course.category}
-        </span>
+        {course.category && (
+          <span className="absolute top-3.5 left-3.5 rounded-full bg-white/95 px-3 py-1 text-xs font-semibold text-gray-900">
+            {course.category}
+          </span>
+        )}
       </div>
       <div className="flex flex-1 flex-col p-5">
         <div className="mb-2 flex items-center gap-1.5 text-sm text-gray-500">
@@ -62,14 +64,15 @@ export default function CourseCard({ course }) {
           <span
             className={`text-sm font-semibold ${course.cta === 'Resume' ? 'text-blue-700' : 'text-gray-700'}`}
           >
-            {course.meta}
+            {course.meta ??
+              `${totalLessons} lesson${totalLessons === 1 ? '' : 's'}`}
           </span>
           {lessonPath ? (
             <Link
               to={lessonPath}
               className="rounded-lg bg-blue-700 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-800"
             >
-              {course.cta}
+              {course.cta ?? 'Start Learning'}
             </Link>
           ) : (
             <span className="rounded-lg bg-gray-100 px-5 py-2.5 text-sm font-semibold text-gray-400">
