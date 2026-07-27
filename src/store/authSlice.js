@@ -37,5 +37,10 @@ export const { setCredentials, setUser, logout } = authSlice.actions
 
 export const selectIsAuthenticated = (state) => Boolean(state.auth.access)
 export const selectCurrentUser = (state) => state.auth.user
+export const selectIsStaff = (state) => Boolean(state.auth.user?.is_staff)
+// Sessions stored before /me returned is_staff have no flag to judge by; the
+// admin gate waits for a fresh /me rather than bouncing the user out.
+export const selectStaffKnown = (state) =>
+  state.auth.user?.is_staff !== undefined
 
 export default authSlice.reducer

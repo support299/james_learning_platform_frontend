@@ -6,6 +6,7 @@ import {
 } from '../store/coursesApi.js'
 import { isCourseComplete } from '../utils/progress.js'
 import { setQuery, setPage } from '../store/filtersSlice.js'
+import { selectIsStaff } from '../store/authSlice.js'
 import CourseCard from '../components/CourseCard.jsx'
 import { SearchIcon, ChevronIcon } from '../components/Icons.jsx'
 import SiteHeader from '../components/SiteHeader.jsx'
@@ -19,6 +20,7 @@ export default function CoursesPage() {
     useGetCoursesQuery()
   const { data: completions = {} } = useGetMyCompletionsQuery()
   const { query, page } = useSelector((state) => state.filters)
+  const isStaff = useSelector(selectIsStaff)
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -92,7 +94,9 @@ export default function CoursesPage() {
           <p className="py-12 text-center text-gray-500">
             {query.trim()
               ? 'No courses match your search.'
-              : 'No courses yet. Create one from the Admin page.'}
+              : isStaff
+                ? 'No courses yet. Create one from the Admin page.'
+                : 'No courses have been assigned to you yet. Your instructor will add them here.'}
           </p>
         )}
 
@@ -137,7 +141,8 @@ export default function CoursesPage() {
         )}
       </main>
 
-      <SiteFooter links={[{ label: 'Admin', to: '/admin' }]} />
+      {/* The admin area is staff-only, so students aren't pointed at it. */}
+      <SiteFooter links={isStaff ? [{ label: 'Admin', to: '/admin' }] : []} />
     </div>
   )
 }

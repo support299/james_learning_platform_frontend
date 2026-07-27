@@ -269,13 +269,18 @@ export default function AdminPage() {
               Manage and organize your curriculums.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => setShowNewCourse(true)}
-            className={blackButton}
-          >
-            + New Course
-          </button>
+          <div className="flex flex-wrap items-center gap-3">
+            <Link to="/admin/students" className={outlineButton}>
+              Students
+            </Link>
+            <button
+              type="button"
+              onClick={() => setShowNewCourse(true)}
+              className={blackButton}
+            >
+              + New Course
+            </button>
+          </div>
         </div>
 
         {/* Toolbar — search + sort */}

@@ -3,6 +3,7 @@ import filtersReducer from './filtersSlice.js'
 import authReducer, { AUTH_KEY } from './authSlice.js'
 import { coursesApi } from './coursesApi.js'
 import { authApi } from './authApi.js'
+import { studentsApi } from './studentsApi.js'
 
 export const store = configureStore({
   reducer: {
@@ -10,9 +11,14 @@ export const store = configureStore({
     auth: authReducer,
     [coursesApi.reducerPath]: coursesApi.reducer,
     [authApi.reducerPath]: authApi.reducer,
+    [studentsApi.reducerPath]: studentsApi.reducer,
   },
   middleware: (getDefaultMiddleware) =>
-    getDefaultMiddleware().concat(coursesApi.middleware, authApi.middleware),
+    getDefaultMiddleware().concat(
+      coursesApi.middleware,
+      authApi.middleware,
+      studentsApi.middleware,
+    ),
 })
 
 let lastAuth = store.getState().auth
