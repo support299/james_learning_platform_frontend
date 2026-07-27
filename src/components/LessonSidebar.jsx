@@ -1,15 +1,11 @@
 import { Link } from 'react-router-dom'
-import { useSelector } from 'react-redux'
-import {
-  selectCompletedForCourse,
-  selectCourseProgress,
-} from '../store/coursesSlice.js'
+import { useGetMyCompletionsQuery } from '../store/coursesApi.js'
+import { courseProgress } from '../utils/progress.js'
 import {
   CheckCircleIcon,
   PlayCircleIcon,
   DocIcon,
   QuizIcon,
-  HelpIcon,
 } from './Icons.jsx'
 
 function lessonIcon(lesson, isCompleted) {
@@ -23,14 +19,15 @@ function lessonMeta(lesson) {
   if (lesson.type === 'video') return `${lesson.duration} • Video`
   if (lesson.type === 'text')
     return lesson.duration ? `Reading • ${lesson.duration}` : 'Lesson'
-  return lesson.meta
+  // Quiz summaries from the API carry no `meta` string, so fall back to the
+  // question count rather than rendering "undefined".
+  return lesson.meta ?? `${lesson.questionCount ?? 0} questions`
 }
 
 export default function LessonSidebar({ course, activeLessonId }) {
-  const completed = useSelector((state) =>
-    selectCompletedForCourse(state, course.id),
-  )
-  const progress = useSelector((state) => selectCourseProgress(state, course))
+  const { data: completions = {} } = useGetMyCompletionsQuery()
+  const completed = completions[course.id] ?? {}
+  const progress = courseProgress(completions, course)
 
   return (
     <aside className="flex w-full shrink-0 flex-col border-r border-gray-200 bg-white lg:w-81">
@@ -97,15 +94,6 @@ export default function LessonSidebar({ course, activeLessonId }) {
           )
         })}
       </nav>
-
-      <div className="border-t border-gray-200 bg-indigo-50/40 px-5 py-4">
-        <a
-          href="#"
-          className="flex items-center justify-center gap-2 text-sm font-medium text-gray-700 hover:text-blue-700"
-        >
-          <HelpIcon /> Help Center
-        </a>
-      </div>
     </aside>
   )
 }

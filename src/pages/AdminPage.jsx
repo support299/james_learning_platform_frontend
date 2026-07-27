@@ -40,8 +40,6 @@ function AddCourseForm({ onDone }) {
     title: title.trim() || 'Course Title',
     description:
       description.trim() || 'A short description of what this course covers.',
-    rating: 0,
-    ratingCount: '0',
     meta: 'New',
     cta: 'Start Learning',
     lessons: [],

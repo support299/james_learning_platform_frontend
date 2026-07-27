@@ -1,7 +1,5 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react'
-
-// Point at the Django API. Override with VITE_API_URL in a .env file if needed.
-const baseUrl = import.meta.env.VITE_API_URL ?? 'http://localhost:8000/api'
+import { API_BASE_URL } from '../config'
 
 // --- Adapters: the API speaks snake_case; the frontend uses camelCase. ---
 
@@ -48,6 +46,16 @@ function fromApiCourse(c) {
   }
 }
 
+// The completions endpoint returns a flat [{course, lesson, completed_at}].
+// Reshape into { [courseId]: { [lessonId]: true } } for O(1) lookups.
+function fromApiCompletions(rows) {
+  const map = {}
+  for (const row of rows) {
+    ;(map[row.course] ??= {})[row.lesson] = true
+  }
+  return map
+}
+
 // Strip camelCase-only keys and rename the ones the API expects.
 function toApiLesson(d) {
   const body = { title: d.title, type: d.type }
@@ -61,8 +69,15 @@ function toApiLesson(d) {
 
 export const coursesApi = createApi({
   reducerPath: 'coursesApi',
-  baseQuery: fetchBaseQuery({ baseUrl }),
-  tagTypes: ['Course', 'Lesson'],
+  baseQuery: fetchBaseQuery({
+    baseUrl: API_BASE_URL,
+    prepareHeaders: (headers, { getState }) => {
+      const token = getState().auth?.access
+      if (token) headers.set('Authorization', `Bearer ${token}`)
+      return headers
+    },
+  }),
+  tagTypes: ['Course', 'Lesson', 'Completion'],
   endpoints: (builder) => ({
     // --- Courses -------------------------------------------------------
     getCourses: builder.query({
@@ -163,6 +178,41 @@ export const coursesApi = createApi({
         { type: 'Course', id: 'LIST' },
       ],
     }),
+    // --- Per-user lesson completions -----------------------------------
+    getMyCompletions: builder.query({
+      query: () => 'me/completions/',
+      transformResponse: (res) => fromApiCompletions(res.results ?? res),
+      providesTags: [{ type: 'Completion', id: 'LIST' }],
+    }),
+    setLessonComplete: builder.mutation({
+      query: ({ courseId, lessonId, completed }) => ({
+        url: `courses/${courseId}/lessons/${lessonId}/complete/`,
+        method: completed ? 'POST' : 'DELETE',
+      }),
+      // Patch the cache up front so the checkmark and progress bars move on
+      // click; both verbs are idempotent server-side, so a failure just rolls
+      // the patch back rather than needing a refetch.
+      async onQueryStarted(
+        { courseId, lessonId, completed },
+        { dispatch, queryFulfilled },
+      ) {
+        const patch = dispatch(
+          coursesApi.util.updateQueryData(
+            'getMyCompletions',
+            undefined,
+            (draft) => {
+              if (completed) (draft[courseId] ??= {})[lessonId] = true
+              else delete draft[courseId]?.[lessonId]
+            },
+          ),
+        )
+        try {
+          await queryFulfilled
+        } catch {
+          patch.undo()
+        }
+      },
+    }),
   }),
 })
 
@@ -177,4 +227,6 @@ export const {
   useCreateLessonMutation,
   useUpdateLessonMutation,
   useDeleteLessonMutation,
+  useGetMyCompletionsQuery,
+  useSetLessonCompleteMutation,
 } = coursesApi

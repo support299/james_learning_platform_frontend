@@ -1,33 +1,88 @@
-import { Link, Navigate, useParams } from 'react-router-dom'
-import { useDispatch, useSelector } from 'react-redux'
-import { getLesson } from '../data/courses.js'
+import { Link, useParams } from 'react-router-dom'
 import {
-  toggleLessonComplete,
-  selectCompletedForCourse,
-  selectCourseById,
-} from '../store/coursesSlice.js'
+  useGetCourseQuery,
+  useGetLessonQuery,
+  useGetMyCompletionsQuery,
+  useSetLessonCompleteMutation,
+} from '../store/coursesApi.js'
 import LessonSidebar from '../components/LessonSidebar.jsx'
 import LessonContent from '../components/LessonContent.jsx'
 import SiteHeader from '../components/SiteHeader.jsx'
 import SiteFooter from '../components/SiteFooter.jsx'
 import { ArrowIcon, CheckCircleIcon } from '../components/Icons.jsx'
 
+function Shell({ children }) {
+  return (
+    <div className="flex min-h-svh flex-col bg-white">
+      <SiteHeader />
+      <main className="mx-auto w-full max-w-4xl flex-1 px-6 py-8">
+        {children}
+      </main>
+      <SiteFooter links={['Privacy Policy', 'Terms of Service', 'Support']} />
+    </div>
+  )
+}
+
 export default function LessonPage() {
   const { courseId, lessonId } = useParams()
-  const dispatch = useDispatch()
 
-  const course = useSelector((state) => selectCourseById(state, courseId))
-  const lesson = getLesson(course, lessonId)
-  const completed = useSelector((state) =>
-    selectCompletedForCourse(state, courseId),
-  )
+  // The course gives us the sidebar + prev/next order; the lesson endpoint is
+  // what carries the body (html/objectives/proTip) — the course payload only
+  // includes lesson summaries.
+  const {
+    data: course,
+    isLoading: courseLoading,
+    error: courseError,
+  } = useGetCourseQuery(courseId)
+  const {
+    data: lesson,
+    isLoading: lessonLoading,
+    error: lessonError,
+  } = useGetLessonQuery({ courseId, lessonId })
 
-  if (!course || !lesson) return <Navigate to="/" replace />
+  const { data: completions = {} } = useGetMyCompletionsQuery()
+  const [setLessonComplete, { isLoading: isSaving }] =
+    useSetLessonCompleteMutation()
 
-  const index = course.lessons.indexOf(lesson)
-  const prev = course.lessons[index - 1]
-  const next = course.lessons[index + 1]
-  const isCompleted = Boolean(completed[lesson.id])
+  if (courseLoading || lessonLoading) {
+    return (
+      <Shell>
+        <p className="py-20 text-center text-gray-500">Loading lesson…</p>
+      </Shell>
+    )
+  }
+
+  const error = courseError ?? lessonError
+  if (error || !course || !lesson) {
+    const missing = error?.status === 404 || !course || !lesson
+    return (
+      <Shell>
+        <div className="py-20 text-center">
+          <h1 className="text-2xl font-bold text-gray-900">
+            {missing ? 'Lesson not found' : 'Couldn’t reach the API'}
+          </h1>
+          <p className="mt-1 text-sm text-gray-500">
+            {missing
+              ? 'It may have been deleted or renamed.'
+              : 'Make sure the Django server is running on port 8000.'}
+          </p>
+          <Link
+            to="/"
+            className="mt-4 inline-block rounded-lg border border-gray-200 px-5 py-2.5 text-sm font-semibold text-gray-900 hover:bg-gray-50"
+          >
+            Back to courses
+          </Link>
+        </div>
+      </Shell>
+    )
+  }
+
+  // Match on id, not object identity: `lesson` comes from the detail endpoint
+  // and is a different object from its summary in `course.lessons`.
+  const index = course.lessons.findIndex((l) => l.id === lesson.id)
+  const prev = index > 0 ? course.lessons[index - 1] : undefined
+  const next = index === -1 ? undefined : course.lessons[index + 1]
+  const isCompleted = Boolean(completions[course.id]?.[lesson.id])
 
   const navButtonClass =
     'flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-5 py-2.5 text-sm font-semibold text-gray-900 hover:bg-gray-50 disabled:cursor-default disabled:opacity-40'
@@ -68,7 +123,7 @@ export default function LessonPage() {
                 {lesson.overview}
               </p>
             )}
-            {lesson.objectives && (
+            {lesson.objectives?.length > 0 && (
               <div>
                 <h2 className="mb-3 text-2xl font-bold text-gray-900">
                   Key Learning Objectives
@@ -121,15 +176,15 @@ export default function LessonPage() {
             </div>
             <button
               type="button"
+              disabled={isSaving}
               onClick={() =>
-                dispatch(
-                  toggleLessonComplete({
-                    courseId: course.id,
-                    lessonId: lesson.id,
-                  }),
-                )
+                setLessonComplete({
+                  courseId: course.id,
+                  lessonId: lesson.id,
+                  completed: !isCompleted,
+                })
               }
-              className={`flex items-center gap-2 rounded-lg px-6 py-2.5 text-sm font-semibold text-white ${
+              className={`flex items-center gap-2 rounded-lg px-6 py-2.5 text-sm font-semibold text-white disabled:opacity-60 ${
                 isCompleted
                   ? 'bg-green-700 hover:bg-green-800'
                   : 'bg-blue-700 hover:bg-blue-800'

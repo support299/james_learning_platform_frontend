@@ -1,11 +1,7 @@
 import { Link } from 'react-router-dom'
-import { useSelector } from 'react-redux'
 import { firstLessonPath } from '../data/courses.js'
-import {
-  selectCompletedForCourse,
-  selectCourseProgress,
-} from '../store/coursesSlice.js'
-import { StarIcon } from './Icons.jsx'
+import { useGetMyCompletionsQuery } from '../store/coursesApi.js'
+import { completedCount, courseProgress } from '../utils/progress.js'
 import CourseProgress from './CourseProgress.jsx'
 
 const bannerByCategory = {
@@ -16,10 +12,10 @@ const bannerByCategory = {
 
 export default function CourseCard({ course }) {
   const lessonPath = firstLessonPath(course)
-  const progress = useSelector((state) => selectCourseProgress(state, course))
-  const doneCount = useSelector(
-    (state) => Object.keys(selectCompletedForCourse(state, course.id)).length,
-  )
+  // RTK Query dedupes this across every card on the page into one request.
+  const { data: completions = {} } = useGetMyCompletionsQuery()
+  const progress = courseProgress(completions, course)
+  const doneCount = completedCount(completions, course)
   const totalLessons = course.lessons.length
 
   return (
@@ -34,23 +30,6 @@ export default function CourseCard({ course }) {
         )}
       </div>
       <div className="flex flex-1 flex-col p-5">
-        <div className="mb-2 flex items-center gap-1.5 text-sm text-gray-500">
-          {course.rating > 0 ? (
-            <>
-              <span className="text-blue-700">
-                <StarIcon />
-              </span>
-              <strong className="font-semibold text-gray-900">
-                {course.rating.toFixed(1)}
-              </strong>
-              <span>({course.ratingCount})</span>
-            </>
-          ) : (
-            <span className="text-xs font-semibold tracking-wide text-emerald-600 uppercase">
-              Not rated yet
-            </span>
-          )}
-        </div>
         <h2 className="mb-2 text-xl font-bold text-gray-900">{course.title}</h2>
         <p className="flex-1 text-sm text-gray-500">{course.description}</p>
         {totalLessons > 0 && (

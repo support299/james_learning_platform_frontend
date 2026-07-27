@@ -1,6 +1,10 @@
 import { useMemo } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
-import { useGetCoursesQuery } from '../store/coursesApi.js'
+import {
+  useGetCoursesQuery,
+  useGetMyCompletionsQuery,
+} from '../store/coursesApi.js'
+import { isCourseComplete } from '../utils/progress.js'
 import { setQuery, setPage } from '../store/filtersSlice.js'
 import CourseCard from '../components/CourseCard.jsx'
 import { SearchIcon, ChevronIcon } from '../components/Icons.jsx'
@@ -13,17 +17,25 @@ export default function CoursesPage() {
   const dispatch = useDispatch()
   const { data: courses = [], isLoading, isError, refetch } =
     useGetCoursesQuery()
+  const { data: completions = {} } = useGetMyCompletionsQuery()
   const { query, page } = useSelector((state) => state.filters)
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
-    return courses.filter(
+    const matches = courses.filter(
       (c) =>
         q === '' ||
         c.title.toLowerCase().includes(q) ||
         (c.description ?? '').toLowerCase().includes(q),
     )
-  }, [courses, query])
+    // Finished courses sink to the bottom. Sort is stable, so everything
+    // within each group keeps the API's ordering (most recently updated first).
+    return [...matches].sort(
+      (a, b) =>
+        Number(isCourseComplete(completions, a)) -
+        Number(isCourseComplete(completions, b)),
+    )
+  }, [courses, query, completions])
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const currentPage = Math.min(page, pageCount)

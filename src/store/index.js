@@ -1,27 +1,29 @@
 import { configureStore } from '@reduxjs/toolkit'
-import coursesReducer, { STORAGE_KEY } from './coursesSlice.js'
 import filtersReducer from './filtersSlice.js'
+import authReducer, { AUTH_KEY } from './authSlice.js'
 import { coursesApi } from './coursesApi.js'
+import { authApi } from './authApi.js'
 
 export const store = configureStore({
   reducer: {
-    courses: coursesReducer,
     filters: filtersReducer,
+    auth: authReducer,
     [coursesApi.reducerPath]: coursesApi.reducer,
+    [authApi.reducerPath]: authApi.reducer,
   },
   middleware: (getDefaultMiddleware) =>
-    getDefaultMiddleware().concat(coursesApi.middleware),
+    getDefaultMiddleware().concat(coursesApi.middleware, authApi.middleware),
 })
 
-let lastList = store.getState().courses.list
+let lastAuth = store.getState().auth
 store.subscribe(() => {
-  const { list } = store.getState().courses
-  if (list !== lastList) {
-    lastList = list
+  const state = store.getState()
+  if (state.auth !== lastAuth) {
+    lastAuth = state.auth
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(list))
+      localStorage.setItem(AUTH_KEY, JSON.stringify(state.auth))
     } catch {
-      // storage full/unavailable — persistence is best-effort in the prototype
+      // ignore — auth will simply not persist across reloads
     }
   }
 })
