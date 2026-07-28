@@ -27,7 +27,7 @@ export default function LoginPage() {
   const location = useLocation()
   const isAuthed = useSelector(selectIsAuthenticated)
 
-  const [username, setUsername] = useState('')
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState(null)
 
@@ -35,7 +35,7 @@ export default function LoginPage() {
   const [fetchMe] = useLazyGetMeQuery()
 
   const redirectTo = location.state?.from ?? '/'
-  const canSubmit = username.trim() !== '' && password !== '' && !isLoading
+  const canSubmit = email.trim() !== '' && password !== '' && !isLoading
 
   // Already signed in — no reason to be here.
   if (isAuthed) {
@@ -48,7 +48,7 @@ export default function LoginPage() {
     setError(null)
     try {
       const tokens = await login({
-        username: username.trim(),
+        email: email.trim(),
         password,
       }).unwrap()
       dispatch(setCredentials(tokens))
@@ -61,7 +61,7 @@ export default function LoginPage() {
       }
       navigate(redirectTo, { replace: true })
     } catch (err) {
-      setError(errorMessage(err, 'Invalid username or password.'))
+      setError(errorMessage(err, 'Invalid email or password.'))
     }
   }
 
@@ -87,17 +87,18 @@ export default function LoginPage() {
           <form onSubmit={submit} className="space-y-4">
             <div>
               <label
-                htmlFor="username"
+                htmlFor="email"
                 className="mb-1.5 block text-sm font-semibold text-gray-700"
               >
-                Username
+                Email
               </label>
               <input
-                id="username"
-                type="text"
-                autoComplete="username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                id="email"
+                type="email"
+                autoComplete="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@example.com"
                 className={inputClass}
                 autoFocus
               />
