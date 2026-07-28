@@ -6,6 +6,7 @@ import {
   setCredentials,
   setUser,
   selectIsAuthenticated,
+  selectIsStaff,
 } from '../store/authSlice.js'
 import SiteHeader from '../components/SiteHeader.jsx'
 import { LogoMark } from '../components/Icons.jsx'
@@ -26,6 +27,7 @@ export default function LoginPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const isAuthed = useSelector(selectIsAuthenticated)
+  const isAdmin = useSelector(selectIsStaff)
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -34,12 +36,14 @@ export default function LoginPage() {
   const [login, { isLoading }] = useLoginMutation()
   const [fetchMe] = useLazyGetMeQuery()
 
-  const redirectTo = location.state?.from ?? '/'
+  // Where to land once signed in: whatever page bounced them here, else the
+  // home appropriate to the account — the admin area for staff.
+  const landing = (admin) => location.state?.from ?? (admin ? '/admin' : '/')
   const canSubmit = email.trim() !== '' && password !== '' && !isLoading
 
   // Already signed in — no reason to be here.
   if (isAuthed) {
-    navigate(redirectTo, { replace: true })
+    navigate(landing(isAdmin), { replace: true })
     return null
   }
 
@@ -52,14 +56,17 @@ export default function LoginPage() {
         password,
       }).unwrap()
       dispatch(setCredentials(tokens))
-      // login returns tokens only; fetch the user for the header.
+      // login returns tokens and is_admin; fetch the rest of the user for the
+      // header.
       try {
         const me = await fetchMe().unwrap()
         dispatch(setUser(me))
       } catch {
         // non-fatal — the header just won't show a name until next load
       }
-      navigate(redirectTo, { replace: true })
+      // Read the flag off the response rather than the store: this closure
+      // still sees the pre-login state.
+      navigate(landing(tokens.is_admin), { replace: true })
     } catch (err) {
       setError(errorMessage(err, 'Invalid email or password.'))
     }

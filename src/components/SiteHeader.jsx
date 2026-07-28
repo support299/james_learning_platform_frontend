@@ -5,10 +5,11 @@ import {
   logout,
   selectIsAuthenticated,
   selectCurrentUser,
+  selectIsStaff,
 } from '../store/authSlice.js'
-import { SearchIcon, UserIcon, LogoMark } from './Icons.jsx'
+import { SearchIcon, UserIcon, DocIcon, LogoMark } from './Icons.jsx'
 
-function ProfileMenu({ user, onLogout }) {
+function ProfileMenu({ user, isAdmin, onLogout }) {
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
 
@@ -35,12 +36,18 @@ function ProfileMenu({ user, onLogout }) {
         onClick={() => setOpen((o) => !o)}
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-label="Account menu"
+        aria-label={isAdmin ? 'Account menu (admin)' : 'Account menu'}
         className="flex items-center gap-2 rounded-full p-0.5 pr-2 hover:bg-gray-50"
       >
         <span
           aria-hidden="true"
-          className="flex size-9 items-center justify-center rounded-full bg-gray-100 text-gray-600"
+          // Admins get the brand's ink-and-gold pairing so the account they're
+          // signed in as is obvious at a glance.
+          className={`flex size-9 items-center justify-center rounded-full ${
+            isAdmin
+              ? 'bg-[#0b0b0b] text-[#C8992E]'
+              : 'bg-gray-100 text-gray-600'
+          }`}
         >
           <UserIcon size={18} />
         </span>
@@ -73,6 +80,20 @@ function ProfileMenu({ user, onLogout }) {
             Profile
           </Link>
 
+          {/* An admin's logo now points at /admin, so this is their way back
+              to the student-facing catalog. */}
+          {isAdmin && (
+            <Link
+              to="/"
+              role="menuitem"
+              onClick={() => setOpen(false)}
+              className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              <DocIcon size={16} />
+              Course catalog
+            </Link>
+          )}
+
           <button
             type="button"
             role="menuitem"
@@ -102,6 +123,7 @@ export default function SiteHeader({
   const navigate = useNavigate()
   const isAuthed = useSelector(selectIsAuthenticated)
   const user = useSelector(selectCurrentUser)
+  const isAdmin = useSelector(selectIsStaff)
 
   const signOut = () => {
     dispatch(logout())
@@ -112,7 +134,9 @@ export default function SiteHeader({
     <header className="border-b border-gray-200 bg-white">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-6 px-8 py-4">
         <Link
-          to="/"
+          // Home for an admin is the admin area, which is also where logging
+          // in drops them.
+          to={isAdmin ? '/admin' : '/'}
           className="flex items-center gap-2.5 text-2xl font-extrabold tracking-tight"
         >
           <LogoMark size={32} className="text-[#0b0b0b]" />
@@ -134,7 +158,7 @@ export default function SiteHeader({
 
         <div className="flex items-center gap-3">
           {!showAuth ? null : isAuthed ? (
-            <ProfileMenu user={user} onLogout={signOut} />
+            <ProfileMenu user={user} isAdmin={isAdmin} onLogout={signOut} />
           ) : (
             <Link
               to="/login"
