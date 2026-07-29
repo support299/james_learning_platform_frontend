@@ -13,6 +13,15 @@ function fromApiStudent(s) {
     isActive: s.is_active,
     dateJoined: s.date_joined,
     lastLogin: s.last_login,
+    // The linked GoHighLevel user, or null when the student isn't linked.
+    ghlUser: s.ghl_user
+      ? {
+          id: s.ghl_user.ghl_id,
+          name: s.ghl_user.name,
+          email: s.ghl_user.email,
+          role: s.ghl_user.role,
+        }
+      : null,
   }
 }
 
@@ -35,6 +44,8 @@ function toApiStudent(d) {
   if (d.lastName !== undefined) body.last_name = d.lastName
   if (d.isActive !== undefined) body.is_active = d.isActive
   if (d.password) body.password = d.password
+  // '' is meaningful here — it unlinks the GHL user — so send it through.
+  if (d.ghlUserId !== undefined) body.ghl_user_id = d.ghlUserId
   return body
 }
 

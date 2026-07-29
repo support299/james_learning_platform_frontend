@@ -8,6 +8,7 @@ import {
 } from '../store/studentsApi.js'
 import { formatDate, slugify } from '../utils/adminHelpers.js'
 import SiteHeader from '../components/SiteHeader.jsx'
+import GhlUserPicker from '../components/GhlUserPicker.jsx'
 import { SearchIcon, TrashIcon, ArrowIcon } from '../components/Icons.jsx'
 import {
   Modal,
@@ -40,12 +41,25 @@ function AddStudentForm({ onDone }) {
   const [username, setUsername] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  // The GHL user picked from the suggestions, or null when none was picked.
+  const [ghlUser, setGhlUser] = useState(null)
   // Once the admin edits the username by hand, stop deriving it from the name.
   const [usernameTouched, setUsernameTouched] = useState(false)
   const [error, setError] = useState(null)
 
   const suggested = slugify(`${firstName} ${lastName}`)
   const effectiveUsername = usernameTouched ? username : suggested
+
+  // Picking a GHL user fills the account details in from it — that's the point
+  // of searching first. The fields stay editable, and clearing the link leaves
+  // whatever is in them alone rather than wiping the admin's edits.
+  const pickGhlUser = (user) => {
+    setGhlUser(user)
+    if (!user) return
+    setFirstName(user.firstName)
+    setLastName(user.lastName)
+    if (user.email) setEmail(user.email)
+  }
 
   const canSubmit =
     effectiveUsername.trim() !== '' &&
@@ -63,6 +77,7 @@ function AddStudentForm({ onDone }) {
         firstName: firstName.trim(),
         lastName: lastName.trim(),
         password,
+        ghlUserId: ghlUser?.id ?? '',
       }).unwrap()
       onDone?.()
     } catch (err) {
@@ -72,6 +87,14 @@ function AddStudentForm({ onDone }) {
 
   return (
     <form onSubmit={submit} className="space-y-5">
+      <Field label="GoHighLevel User (optional)">
+        <GhlUserPicker value={ghlUser} onChange={pickGhlUser} autoFocus />
+        <p className="mt-1.5 text-xs text-stone-500">
+          Search by name — the details below fill in from the GoHighLevel user
+          you pick. Skip it to create the student by hand.
+        </p>
+      </Field>
+
       <div className="grid gap-5 sm:grid-cols-2">
         <Field label="First Name">
           <input
@@ -80,7 +103,6 @@ function AddStudentForm({ onDone }) {
             onChange={(e) => setFirstName(e.target.value)}
             placeholder="e.g. Alex"
             className={inputClass}
-            autoFocus
           />
         </Field>
         <Field label="Last Name">
@@ -136,7 +158,7 @@ function AddStudentForm({ onDone }) {
         </p>
       </Field>
 
-      {error && <p className="text-sm font-medium text-red-600">{error}</p>}
+      {error &&<p className="text-sm font-medium text-red-600">{error}</p>}
 
       <button type="submit" disabled={!canSubmit} className={blackButton}>
         {isLoading ? 'Creating…' : '+ Create Student'}

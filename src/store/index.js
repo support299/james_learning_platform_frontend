@@ -4,6 +4,7 @@ import authReducer, { AUTH_KEY } from './authSlice.js'
 import { coursesApi } from './coursesApi.js'
 import { authApi } from './authApi.js'
 import { studentsApi } from './studentsApi.js'
+import { ghlApi } from './ghlApi.js'
 
 export const store = configureStore({
   reducer: {
@@ -12,12 +13,14 @@ export const store = configureStore({
     [coursesApi.reducerPath]: coursesApi.reducer,
     [authApi.reducerPath]: authApi.reducer,
     [studentsApi.reducerPath]: studentsApi.reducer,
+    [ghlApi.reducerPath]: ghlApi.reducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware().concat(
       coursesApi.middleware,
       authApi.middleware,
       studentsApi.middleware,
+      ghlApi.middleware,
     ),
 })
 
