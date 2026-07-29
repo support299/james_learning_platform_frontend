@@ -32,7 +32,17 @@ export const ghlApi = createApi({
       // Typing back and forth over the same few letters shouldn't re-hit GHL.
       keepUnusedDataFor: 120,
     }),
+
+    // Public: trades the GHL user id from an academy link's ?logid= for a
+    // session. Returns the same {user, access, refresh, is_admin} as /login.
+    ghlAutoLogin: builder.mutation({
+      query: (logid) => ({
+        url: 'ghl/autologin/',
+        method: 'POST',
+        body: { logid },
+      }),
+    }),
   }),
 })
 
-export const { useSearchGhlUsersQuery } = ghlApi
+export const { useSearchGhlUsersQuery, useGhlAutoLoginMutation } = ghlApi

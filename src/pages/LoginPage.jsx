@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
 import { useLoginMutation, useLazyGetMeQuery } from '../store/authApi.js'
 import {
@@ -41,10 +41,11 @@ export default function LoginPage() {
   const landing = (admin) => location.state?.from ?? (admin ? '/admin' : '/')
   const canSubmit = email.trim() !== '' && password !== '' && !isLoading
 
-  // Already signed in — no reason to be here.
+  // Already signed in — no reason to be here. Redirecting declaratively
+  // rather than calling navigate() here: that's a side effect during render,
+  // which React is free to drop, leaving the `return null` on screen.
   if (isAuthed) {
-    navigate(landing(isAdmin), { replace: true })
-    return null
+    return <Navigate to={landing(isAdmin)} replace />
   }
 
   const submit = async (e) => {
