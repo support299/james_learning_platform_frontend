@@ -7,13 +7,11 @@ import {
   useDeleteCourseMutation,
 } from '../store/coursesApi.js'
 import { formatDate } from '../utils/adminHelpers.js'
-import CourseCard from '../components/CourseCard.jsx'
 import SiteHeader from '../components/SiteHeader.jsx'
 import { DotsIcon, SearchIcon, ChevronIcon } from '../components/Icons.jsx'
 import {
   Modal,
   Field,
-  PreviewHeading,
   inputClass,
   monoLabel,
   blackButton,
@@ -35,16 +33,6 @@ function AddCourseForm({ onDone }) {
   const [description, setDescription] = useState('')
   const [error, setError] = useState(null)
 
-  const draft = {
-    id: 'preview',
-    title: title.trim() || 'Course Title',
-    description:
-      description.trim() || 'A short description of what this course covers.',
-    meta: 'New',
-    cta: 'Start Learning',
-    lessons: [],
-  }
-
   const canSubmit = title.trim() !== '' && description.trim() !== '' && !isLoading
 
   const submit = async (e) => {
@@ -64,39 +52,30 @@ function AddCourseForm({ onDone }) {
   }
 
   return (
-    <div className="grid gap-10 lg:grid-cols-2">
-      <form onSubmit={submit} className="space-y-5">
-        <Field label="Course Title">
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="e.g. Design Systems 101"
-            className={inputClass}
-          />
-        </Field>
-        <Field label="Description">
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            rows={3}
-            placeholder="What will students learn?"
-            className={inputClass}
-          />
-        </Field>
-        {error && <p className="text-sm font-medium text-red-600">{error}</p>}
-        <button type="submit" disabled={!canSubmit} className={blackButton}>
-          {isLoading ? 'Creating…' : '+ Create & Add Lessons'}
-        </button>
-      </form>
-
-      <div>
-        <PreviewHeading>Preview — catalog card</PreviewHeading>
-        <div className="pointer-events-none max-w-sm">
-          <CourseCard course={draft} />
-        </div>
-      </div>
-    </div>
+    <form onSubmit={submit} className="space-y-5">
+      <Field label="Course Title">
+        <input
+          type="text"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="e.g. Design Systems 101"
+          className={inputClass}
+        />
+      </Field>
+      <Field label="Description">
+        <textarea
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          rows={3}
+          placeholder="What will students learn?"
+          className={inputClass}
+        />
+      </Field>
+      {error && <p className="text-sm font-medium text-red-600">{error}</p>}
+      <button type="submit" disabled={!canSubmit} className={blackButton}>
+        {isLoading ? 'Creating…' : '+ Create & Add Lessons'}
+      </button>
+    </form>
   )
 }
 
