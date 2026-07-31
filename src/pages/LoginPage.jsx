@@ -144,11 +144,6 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <p className="mt-6 text-center text-sm">
-            <Link to="/" className="text-gray-400 hover:text-gray-600">
-              ← Back to courses
-            </Link>
-          </p>
         </div>
       </main>
     </div>

@@ -1,5 +1,5 @@
-import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react'
-import { API_BASE_URL } from '../config'
+import { createApi } from '@reduxjs/toolkit/query/react'
+import { authBaseQuery } from './authApi.js'
 
 // --- Adapters: the API speaks snake_case; the frontend uses camelCase. ---
 
@@ -69,14 +69,7 @@ function toApiLesson(d) {
 
 export const coursesApi = createApi({
   reducerPath: 'coursesApi',
-  baseQuery: fetchBaseQuery({
-    baseUrl: API_BASE_URL,
-    prepareHeaders: (headers, { getState }) => {
-      const token = getState().auth?.access
-      if (token) headers.set('Authorization', `Bearer ${token}`)
-      return headers
-    },
-  }),
+  baseQuery: authBaseQuery,
   tagTypes: ['Course', 'Lesson', 'Completion'],
   endpoints: (builder) => ({
     // --- Courses -------------------------------------------------------
