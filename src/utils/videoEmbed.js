@@ -30,3 +30,27 @@ export function toVideoEmbed(input) {
 }
 
 export const SUPPORTED_VIDEO_HOSTS = 'YouTube, Loom, or Vimeo'
+
+const EMBED_ID_PATTERNS = {
+  youtube: /youtube(?:-nocookie)?\.com\/embed\/([\w-]+)/,
+  loom: /loom\.com\/embed\/([\w-]+)/,
+  vimeo: /vimeo\.com\/video\/(\d+)/,
+}
+
+// The inverse of toVideoEmbed: given a provider (read off an embed's
+// data-provider attribute) and its iframe src, recover the id that
+// identifies this specific video for progress tracking. Mirrors
+// backend/courses/embeds.py so both sides agree on the same id.
+// Lessons don't reliably carry `type: 'video'` — the editor always saves
+// `type: 'text'` regardless of content (see LessonEditorPage.jsx). Whether a
+// lesson has anything to track is a property of its html, not its type.
+export function hasVideoEmbed(html) {
+  return typeof html === 'string' && html.includes('data-embed')
+}
+
+export function extractEmbedId(provider, src) {
+  const pattern = EMBED_ID_PATTERNS[provider]
+  if (!pattern || !src) return null
+  const match = src.match(pattern)
+  return match ? match[1] : null
+}

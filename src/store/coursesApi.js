@@ -56,6 +56,17 @@ function fromApiCompletions(rows) {
   return map
 }
 
+function fromApiVideoProgress(p) {
+  return {
+    provider: p.provider,
+    externalId: p.external_id,
+    durationSeconds: p.duration_seconds,
+    maxWatchedSeconds: p.max_watched_seconds,
+    focusedTimeSeconds: p.focused_time_seconds,
+    updatedAt: p.updated_at,
+  }
+}
+
 // Strip camelCase-only keys and rename the ones the API expects.
 function toApiLesson(d) {
   const body = { title: d.title, type: d.type }
@@ -70,7 +81,7 @@ function toApiLesson(d) {
 export const coursesApi = createApi({
   reducerPath: 'coursesApi',
   baseQuery: authBaseQuery,
-  tagTypes: ['Course', 'Lesson', 'Completion'],
+  tagTypes: ['Course', 'Lesson', 'Completion', 'VideoProgress'],
   endpoints: (builder) => ({
     // --- Courses -------------------------------------------------------
     getCourses: builder.query({
@@ -206,6 +217,62 @@ export const coursesApi = createApi({
         }
       },
     }),
+    // --- Per-embed video watch progress (a lesson can embed >1 video) --
+    getVideoProgress: builder.query({
+      query: ({ courseId, lessonId }) =>
+        `courses/${courseId}/lessons/${lessonId}/video-progress/`,
+      transformResponse: (res) => res.map(fromApiVideoProgress),
+      providesTags: (result, error, { lessonId }) => [
+        { type: 'VideoProgress', id: lessonId },
+      ],
+    }),
+    reportVideoProgress: builder.mutation({
+      query: ({
+        courseId,
+        lessonId,
+        provider,
+        externalId,
+        currentTime,
+        focusedDeltaSeconds,
+        durationSeconds,
+      }) => ({
+        url: `courses/${courseId}/lessons/${lessonId}/video-progress/`,
+        method: 'POST',
+        body: {
+          provider,
+          external_id: externalId,
+          current_time: currentTime,
+          focused_delta_seconds: focusedDeltaSeconds,
+          duration_seconds: durationSeconds,
+        },
+      }),
+      transformResponse: fromApiVideoProgress,
+      // Patch the one row that changed rather than invalidating, since
+      // heartbeats fire every ~10s and a refetch per embed would be chatty.
+      async onQueryStarted(
+        { courseId, lessonId, provider, externalId },
+        { dispatch, queryFulfilled },
+      ) {
+        try {
+          const { data } = await queryFulfilled
+          dispatch(
+            coursesApi.util.updateQueryData(
+              'getVideoProgress',
+              { courseId, lessonId },
+              (draft) => {
+                const i = draft.findIndex(
+                  (p) => p.provider === provider && p.externalId === externalId,
+                )
+                if (i >= 0) draft[i] = data
+                else draft.push(data)
+              },
+            ),
+          )
+        } catch {
+          // Heartbeat failures aren't user-visible; the next tick retries.
+        }
+      },
+    }),
   }),
 })
 
@@ -222,4 +289,6 @@ export const {
   useDeleteLessonMutation,
   useGetMyCompletionsQuery,
   useSetLessonCompleteMutation,
+  useGetVideoProgressQuery,
+  useReportVideoProgressMutation,
 } = coursesApi
