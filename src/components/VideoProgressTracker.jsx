@@ -91,7 +91,9 @@ function describeReportFailure(error) {
 // blocks skipping ahead of the furthest point reached, and reports
 // heartbeats (watched position + focused time) so the backend can gate
 // lesson completion on real playback. A lesson can embed more than one
-// video, so each embed is tracked independently.
+// video, so each embed is tracked independently — except that starting
+// one pauses every other tracked embed in the same lesson, so at most one
+// plays at a time.
 export default function VideoProgressTracker({ courseId, lessonId, children }) {
   const containerRef = useRef(null)
   const { data: progress = [], refetch: refetchProgress } = useGetVideoProgressQuery({
@@ -166,17 +168,26 @@ export default function VideoProgressTracker({ courseId, lessonId, children }) {
           existing?.durationSeconds ?? cached?.durationSeconds ?? saved?.durationSeconds ?? null,
         getCurrentTime: () => 0,
         seekTo: () => {},
+        pause: () => {},
       }
       trackersRef.current.set(key, state)
 
+      // Only one embed in a lesson should ever be playing at once: whichever
+      // one starts playing tells every other tracked embed to pause.
+      const notifyPlaying = () => {
+        for (const [otherKey, otherState] of trackersRef.current) {
+          if (otherKey !== key) otherState.pause()
+        }
+      }
+
       if (provider === 'youtube') {
-        cleanups.push(setUpYouTube(wrapper, state))
+        cleanups.push(setUpYouTube(wrapper, state, notifyPlaying))
         // Only wired for YouTube: state.seekTo is a no-op for Loom (see
         // setUpLoom), so the button would have nothing to act on there.
         cleanups.push(setUpSkipButton(wrapper, state))
       } else {
         const iframe = wrapper.querySelector('iframe')
-        if (iframe) cleanups.push(setUpLoom(iframe, state))
+        if (iframe) cleanups.push(setUpLoom(iframe, state, notifyPlaying))
       }
       // Vimeo (or any other recognized-but-untracked provider) is left as a
       // plain embed — no tracking wired up for it yet.
@@ -351,7 +362,7 @@ export default function VideoProgressTracker({ courseId, lessonId, children }) {
   )
 }
 
-function setUpYouTube(wrapper, state) {
+function setUpYouTube(wrapper, state, onPlay) {
   // YT.Player takes ownership of whatever element it's given and removes it
   // from the DOM on destroy(). Mounting into a disposable child of `wrapper`
   // (instead of the wrapper, or the original static <iframe>, directly)
@@ -382,6 +393,9 @@ function setUpYouTube(wrapper, state) {
       videoId: state.externalId,
       playerVars: { enablejsapi: 1, origin: window.location.origin },
       events: {
+        onStateChange: (event) => {
+          if (event.data === YT.PlayerState.PLAYING) onPlay()
+        },
         onReady: () => {
           state.durationSeconds = player.getDuration() || state.durationSeconds
           if (state.maxWatchedSeconds > 0) {
@@ -420,11 +434,22 @@ function setUpYouTube(wrapper, state) {
 
   state.getCurrentTime = () => (player ? player.getCurrentTime() : 0)
   state.seekTo = (seconds) => player?.seekTo(seconds, true)
+  state.pause = () => player?.pauseVideo?.()
 
   return () => {
     cancelled = true
     if (pollId) clearInterval(pollId)
-    player?.destroy?.()
+    try {
+      player?.destroy?.()
+    } catch {
+      // Navigating to a lesson whose html also contains a video replaces
+      // this whole subtree (dangerouslySetInnerHTML) before this cleanup
+      // runs, so the player's iframe can already be detached from the
+      // document. YT's destroy() assumes it still has a parent to remove
+      // itself from and throws otherwise — nothing left to clean up either
+      // way, but left unguarded this throw was aborting the rest of this
+      // effects pass, which is what set up the *next* lesson's player.
+    }
   }
 }
 
@@ -470,7 +495,7 @@ function setUpSkipButton(wrapper, state) {
 // postMessage events on a best-effort basis. The exact event/field names
 // aren't formally documented, so this defensively checks a few known shapes
 // and should be re-verified against a real Loom embed before relying on it.
-function setUpLoom(iframe, state) {
+function setUpLoom(iframe, state, onPlay) {
   let currentTime = 0
   let lastEventAt = Date.now()
 
@@ -478,6 +503,12 @@ function setUpLoom(iframe, state) {
     if (event.origin !== LOOM_ORIGIN || event.source !== iframe.contentWindow) return
     const data = typeof event.data === 'string' ? safeJsonParse(event.data) : event.data
     if (!data) return
+
+    // Same caveat as the seek postMessage below: Loom's outbound event
+    // names aren't formally documented, so this checks the shapes observed
+    // in the wild rather than a confirmed contract.
+    const eventType = typeof data.event === 'string' ? data.event.toLowerCase() : null
+    if (eventType === 'play' || eventType === 'playing') onPlay()
 
     const reportedTime = data.currentTime ?? data.playhead ?? data.seconds
     const reportedDuration = data.duration ?? data.videoDuration
@@ -510,6 +541,9 @@ function setUpLoom(iframe, state) {
 
   window.addEventListener('message', handleMessage)
   state.getCurrentTime = () => currentTime
+  // Best-effort, same as the seek command above — may not affect playback
+  // on all embeds since Loom's inbound command contract is unverified.
+  state.pause = () => iframe.contentWindow?.postMessage({ event: 'pause' }, LOOM_ORIGIN)
 
   return () => window.removeEventListener('message', handleMessage)
 }

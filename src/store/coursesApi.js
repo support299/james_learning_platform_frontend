@@ -221,6 +221,15 @@ export const coursesApi = createApi({
     getVideoProgress: builder.query({
       query: ({ courseId, lessonId }) =>
         `courses/${courseId}/lessons/${lessonId}/video-progress/`,
+      // Callers pass courseId/lessonId as both route-param strings (e.g.
+      // LessonPage, straight from useParams) and numeric ids (e.g.
+      // VideoProgressTracker, from course.id/lesson.id). Without this, RTK
+      // Query's default arg serialization treats "12" and 12 as different
+      // cache entries, so VideoProgressTracker's heartbeat patches would land
+      // in a cache entry LessonPage never reads from, leaving its "Mark as
+      // Complete" gate stuck at stale data until a full refetch.
+      serializeQueryArgs: ({ queryArgs: { courseId, lessonId } }) =>
+        `${courseId}:${lessonId}`,
       transformResponse: (res) => res.map(fromApiVideoProgress),
       providesTags: (result, error, { lessonId }) => [
         { type: 'VideoProgress', id: lessonId },
