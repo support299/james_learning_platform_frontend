@@ -125,6 +125,10 @@ export default function LessonPage() {
   const prev = index > 0 ? course.lessons[index - 1] : undefined
   const next = index === -1 ? undefined : course.lessons[index + 1]
   const isCompleted = Boolean(completions[course.id]?.[lesson.id])
+  // Quiz lessons submit and complete themselves from within QuizPlayer (see
+  // LessonContent.jsx) — the generic Mark as Complete button below is only
+  // for video/text lessons.
+  const isQuizLesson = lesson.type === 'quiz'
   // Video lessons must be marked complete before the student can move on;
   // other lesson types navigate forward freely as before.
   const nextBlocked = isVideoLesson && !isCompleted
@@ -160,7 +164,11 @@ export default function LessonPage() {
             {lesson.title}
           </h1>
 
-          <LessonContent lesson={lesson} courseId={course.id} />
+          <LessonContent
+            lesson={lesson}
+            courseId={course.id}
+            isCompleted={isCompleted}
+          />
 
           <div className="space-y-5 py-7">
             {lesson.overview && (
@@ -228,35 +236,37 @@ export default function LessonPage() {
                 </button>
               )}
             </div>
-            <div className="flex flex-col items-end gap-1.5">
-              {!isCompleted && !videoGate.eligible && (
-                <p className="text-xs text-gray-500">{videoGate.reason}</p>
-              )}
-              {completeError?.data?.detail && (
-                <p className="text-xs text-red-600">
-                  {[].concat(completeError.data.detail).join(' ')}
-                </p>
-              )}
-              <button
-                type="button"
-                disabled={isSaving || (!isCompleted && !videoGate.eligible)}
-                onClick={() =>
-                  setLessonComplete({
-                    courseId: course.id,
-                    lessonId: lesson.id,
-                    completed: !isCompleted,
-                  })
-                }
-                className={`flex items-center gap-2 rounded-lg px-6 py-2.5 text-sm font-semibold text-white disabled:opacity-60 ${
-                  isCompleted
-                    ? 'bg-green-700 hover:bg-green-800'
-                    : 'bg-blue-700 hover:bg-blue-800'
-                }`}
-              >
-                <CheckCircleIcon size={18} />
-                {isCompleted ? 'Completed' : 'Mark as Complete'}
-              </button>
-            </div>
+            {!isQuizLesson && (
+              <div className="flex flex-col items-end gap-1.5">
+                {!isCompleted && !videoGate.eligible && (
+                  <p className="text-xs text-gray-500">{videoGate.reason}</p>
+                )}
+                {completeError?.data?.detail && (
+                  <p className="text-xs text-red-600">
+                    {[].concat(completeError.data.detail).join(' ')}
+                  </p>
+                )}
+                <button
+                  type="button"
+                  disabled={isSaving || (!isCompleted && !videoGate.eligible)}
+                  onClick={() =>
+                    setLessonComplete({
+                      courseId: course.id,
+                      lessonId: lesson.id,
+                      completed: !isCompleted,
+                    })
+                  }
+                  className={`flex items-center gap-2 rounded-lg px-6 py-2.5 text-sm font-semibold text-white disabled:opacity-60 ${
+                    isCompleted
+                      ? 'bg-green-700 hover:bg-green-800'
+                      : 'bg-blue-700 hover:bg-blue-800'
+                  }`}
+                >
+                  <CheckCircleIcon size={18} />
+                  {isCompleted ? 'Completed' : 'Mark as Complete'}
+                </button>
+              </div>
+            )}
           </div>
         </main>
       </div>

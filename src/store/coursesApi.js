@@ -189,9 +189,11 @@ export const coursesApi = createApi({
       providesTags: [{ type: 'Completion', id: 'LIST' }],
     }),
     setLessonComplete: builder.mutation({
-      query: ({ courseId, lessonId, completed }) => ({
+      query: ({ courseId, lessonId, completed, answers }) => ({
         url: `courses/${courseId}/lessons/${lessonId}/complete/`,
         method: completed ? 'POST' : 'DELETE',
+        // Quiz lessons are graded server-side from this: {questionId: optionId}.
+        body: completed && answers ? { answers } : undefined,
       }),
       // Patch the cache up front so the checkmark and progress bars move on
       // click; both verbs are idempotent server-side, so a failure just rolls
@@ -214,6 +216,12 @@ export const coursesApi = createApi({
           await queryFulfilled
         } catch {
           patch.undo()
+          // A rejected quiz submission means "wrong answer" — refetch the
+          // lesson so the next attempt gets a freshly shuffled order rather
+          // than the one the student just failed.
+          dispatch(
+            coursesApi.util.invalidateTags([{ type: 'Lesson', id: lessonId }]),
+          )
         }
       },
     }),
