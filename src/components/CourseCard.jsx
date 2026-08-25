@@ -4,10 +4,10 @@ import { useGetMyCompletionsQuery } from '../store/coursesApi.js'
 import { completedCount, courseProgress } from '../utils/progress.js'
 import CourseProgress from './CourseProgress.jsx'
 
-const bannerByCategory = {
-  design: 'bg-gradient-to-br from-blue-100 via-violet-100 to-pink-100',
-  tech: 'bg-gradient-to-br from-slate-900 via-blue-900 to-blue-600',
-  business: 'bg-gradient-to-br from-emerald-50 via-emerald-100 to-blue-200',
+const accentByCategory = {
+  design: 'bg-violet-500',
+  tech: 'bg-blue-600',
+  business: 'bg-emerald-500',
 }
 
 export default function CourseCard({ course }) {
@@ -21,17 +21,18 @@ export default function CourseCard({ course }) {
   return (
     <article className="flex flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition-shadow hover:shadow-md">
       <div
-        className={`relative h-42 ${bannerByCategory[course.category?.toLowerCase()] ?? bannerByCategory.design}`}
-      >
+        className={`h-1 ${accentByCategory[course.category?.toLowerCase()] ?? accentByCategory.design}`}
+      />
+      <div className="flex flex-1 flex-col p-5">
         {course.category && (
-          <span className="absolute top-3.5 left-3.5 rounded-full bg-white/95 px-3 py-1 text-xs font-semibold text-gray-900">
+          <span className="mb-1.5 text-xs font-semibold tracking-wide text-gray-400 uppercase">
             {course.category}
           </span>
         )}
-      </div>
-      <div className="flex flex-1 flex-col p-5">
         <h2 className="mb-2 text-xl font-bold text-gray-900">{course.title}</h2>
-        <p className="flex-1 text-sm text-gray-500">{course.description}</p>
+        <p className="mb-1 line-clamp-3 flex-1 text-sm text-gray-500">
+          {course.description}
+        </p>
         {totalLessons > 0 && (
           <CourseProgress
             value={progress}
