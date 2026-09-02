@@ -7,6 +7,7 @@ import { TextStyle, Color } from '@tiptap/extension-text-style'
 import { Embed } from './EmbedNode.js'
 import { toVideoEmbed, SUPPORTED_VIDEO_HOSTS } from '../utils/videoEmbed.js'
 import { ChevronIcon } from './Icons.jsx'
+import { PromptModal } from './adminUi.jsx'
 import {
   BoldIcon,
   ItalicIcon,
@@ -180,31 +181,46 @@ export default function RichTextEditor({ value, onChange }) {
     }),
   })
 
+  const [dialog, setDialog] = useState(null)
+  const [dialogError, setDialogError] = useState(null)
+
   if (!editor || !state) return null
 
   const chain = () => editor.chain().focus()
   const { activeHeading, color: currentColor } = state
 
   const addVideo = () => {
-    const url = window.prompt(`Paste a ${SUPPORTED_VIDEO_HOSTS} link`)
-    if (!url) return
-    const embed = toVideoEmbed(url)
+    setDialogError(null)
+    setDialog('video')
+  }
+
+  const submitVideo = (url) => {
+    if (!url?.trim()) {
+      setDialog(null)
+      return
+    }
+    const embed = toVideoEmbed(url.trim())
     if (!embed) {
-      window.alert(`That link isn't a recognized ${SUPPORTED_VIDEO_HOSTS} URL.`)
+      setDialogError(`That link isn't a recognized ${SUPPORTED_VIDEO_HOSTS} URL.`)
       return
     }
     chain().setEmbed(embed).run()
+    setDialog(null)
+    setDialogError(null)
   }
 
   const setLink = () => {
-    const prev = editor.getAttributes('link').href ?? ''
-    const url = window.prompt('Link URL (leave empty to remove)', prev)
-    if (url === null) return
-    if (url === '') {
+    setDialogError(null)
+    setDialog('link')
+  }
+
+  const submitLink = (url) => {
+    if (url.trim() === '') {
       chain().extendMarkRange('link').unsetLink().run()
-      return
+    } else {
+      chain().extendMarkRange('link').setLink({ href: url.trim() }).run()
     }
-    chain().extendMarkRange('link').setLink({ href: url }).run()
+    setDialog(null)
   }
 
   return (
@@ -369,6 +385,33 @@ export default function RichTextEditor({ value, onChange }) {
         </Btn>
       </div>
       <EditorContent editor={editor} />
+      {dialog === 'video' && (
+        <PromptModal
+          title="Embed video"
+          message={`Paste a ${SUPPORTED_VIDEO_HOSTS} link.`}
+          label="Video URL"
+          placeholder="https://"
+          confirmLabel="Embed"
+          error={dialogError}
+          onSubmit={submitVideo}
+          onClose={() => {
+            setDialog(null)
+            setDialogError(null)
+          }}
+        />
+      )}
+      {dialog === 'link' && (
+        <PromptModal
+          title="Link"
+          message="Paste a URL. Leave empty to remove the current link."
+          label="URL"
+          placeholder="https://"
+          defaultValue={editor.getAttributes('link').href ?? ''}
+          confirmLabel="Apply"
+          onSubmit={submitLink}
+          onClose={() => setDialog(null)}
+        />
+      )}
     </div>
   )
 }

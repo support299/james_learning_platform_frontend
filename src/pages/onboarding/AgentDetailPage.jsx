@@ -227,89 +227,102 @@ export default function AgentDetailPage() {
             No carrier requirements on this agent. Add carriers to a template in Settings.
           </p>
         ) : (
-          <div className="mt-3 overflow-x-auto border border-stone-200 bg-white">
-            <table className="w-full text-left text-sm">
-              <thead className="border-b border-stone-200 bg-stone-50">
-                <tr>
-                  <th className="px-4 py-3 font-medium text-stone-600">Carrier</th>
-                  <th className="px-4 py-3 font-medium text-stone-600">Status</th>
-                  <th className="px-4 py-3 font-medium text-stone-600">Owner</th>
-                  <th className="px-4 py-3 font-medium text-stone-600">Flag</th>
-                </tr>
-              </thead>
-              <tbody>
-                {agent.carriers.map((req) => (
-                  <tr key={req.id} className="border-b border-stone-100">
-                    <td className="px-4 py-3 font-medium">{req.carrierName}</td>
-                    <td className="px-4 py-3">
-                      <select
-                        value={req.status}
-                        disabled={!writable}
-                        className={inputClass}
-                        onChange={(e) =>
-                          run(() =>
-                            patchCarrier({
-                              agentId: agent.id,
-                              reqId: req.id,
-                              status: e.target.value,
-                            }).unwrap(),
-                          )
-                        }
-                      >
-                        {carrierStatuses.map((opt) => (
-                          <option key={opt.value} value={opt.value}>
-                            {opt.label}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
-                    <td className="px-4 py-3">
-                      <select
-                        value={req.owner?.id || ''}
-                        disabled={!writable}
-                        className={inputClass}
-                        onChange={(e) =>
-                          run(() =>
-                            patchCarrier({
-                              agentId: agent.id,
-                              reqId: req.id,
-                              owner_id: e.target.value ? Number(e.target.value) : null,
-                            }).unwrap(),
-                          )
-                        }
-                      >
-                        <option value="">Owner</option>
-                        {(staff ?? []).map((u) => (
-                          <option key={u.id} value={u.id}>
-                            {u.displayName}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
-                    <td className="px-4 py-3">
-                      {writable && (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            run(() =>
-                              patchCarrier({
-                                agentId: agent.id,
-                                reqId: req.id,
-                                is_flagged: !req.isFlagged,
-                              }).unwrap(),
-                            )
-                          }
-                          className="text-xs font-medium text-stone-500"
-                        >
-                          {req.isFlagged ? 'Unflag' : 'Flag'}
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          ['health', 'life'].map((line) => {
+            const rows = agent.carriers.filter((req) => req.carrierLine === line)
+            if (rows.length === 0) return null
+            return (
+              <div key={line} className="mt-4">
+                <h3 className="mb-2 font-mono text-[11px] font-medium tracking-[0.15em] text-stone-500 uppercase">
+                  {line === 'health' ? 'Health' : 'Life'}
+                </h3>
+                <div className="overflow-x-auto border border-stone-200 bg-white">
+                  <table className="w-full text-left text-sm">
+                    <thead className="border-b border-stone-200 bg-stone-50">
+                      <tr>
+                        <th className="px-4 py-3 font-medium text-stone-600">Carrier</th>
+                        <th className="px-4 py-3 font-medium text-stone-600">Status</th>
+                        <th className="px-4 py-3 font-medium text-stone-600">Owner</th>
+                        <th className="px-4 py-3 font-medium text-stone-600">Flag</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.map((req) => (
+                        <tr key={req.id} className="border-b border-stone-100">
+                          <td className="px-4 py-3 font-medium">{req.carrierName}</td>
+                          <td className="px-4 py-3">
+                            <select
+                              value={req.status}
+                              disabled={!writable}
+                              className={inputClass}
+                              onChange={(e) =>
+                                run(() =>
+                                  patchCarrier({
+                                    agentId: agent.id,
+                                    reqId: req.id,
+                                    status: e.target.value,
+                                  }).unwrap(),
+                                )
+                              }
+                            >
+                              {carrierStatuses.map((opt) => (
+                                <option key={opt.value} value={opt.value}>
+                                  {opt.label}
+                                </option>
+                              ))}
+                            </select>
+                          </td>
+                          <td className="px-4 py-3">
+                            <select
+                              value={req.owner?.id || ''}
+                              disabled={!writable}
+                              className={inputClass}
+                              onChange={(e) =>
+                                run(() =>
+                                  patchCarrier({
+                                    agentId: agent.id,
+                                    reqId: req.id,
+                                    owner_id: e.target.value
+                                      ? Number(e.target.value)
+                                      : null,
+                                  }).unwrap(),
+                                )
+                              }
+                            >
+                              <option value="">Owner</option>
+                              {(staff ?? []).map((u) => (
+                                <option key={u.id} value={u.id}>
+                                  {u.displayName}
+                                </option>
+                              ))}
+                            </select>
+                          </td>
+                          <td className="px-4 py-3">
+                            {writable && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  run(() =>
+                                    patchCarrier({
+                                      agentId: agent.id,
+                                      reqId: req.id,
+                                      is_flagged: !req.isFlagged,
+                                    }).unwrap(),
+                                  )
+                                }
+                                className="text-xs font-medium text-stone-500"
+                              >
+                                {req.isFlagged ? 'Unflag' : 'Flag'}
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )
+          })
         )}
       </section>
     </main>

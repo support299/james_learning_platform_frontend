@@ -11,6 +11,7 @@ import SiteHeader from '../components/SiteHeader.jsx'
 import GhlUserPicker from '../components/GhlUserPicker.jsx'
 import { SearchIcon, TrashIcon, ArrowIcon } from '../components/Icons.jsx'
 import {
+  ConfirmModal,
   Modal,
   Field,
   inputClass,
@@ -170,23 +171,20 @@ function AddStudentForm({ onDone }) {
 function StudentRow({ student }) {
   const [updateStudent, { isLoading: isSaving }] = useUpdateStudentMutation()
   const [deleteStudent, { isLoading: isDeleting }] = useDeleteStudentMutation()
+  const [confirming, setConfirming] = useState(false)
 
   const toggleActive = () =>
     updateStudent({ id: student.id, isActive: !student.isActive })
 
-  const remove = () => {
-    if (
-      window.confirm(
-        `Delete ${student.username}? Their course progress is deleted too.`,
-      )
-    ) {
-      deleteStudent(student.id)
-    }
+  const remove = async () => {
+    await deleteStudent(student.id)
+    setConfirming(false)
   }
 
   const name = fullName(student)
 
   return (
+    <>
     <tr className="border-t border-stone-200">
       <td className="px-4 py-3.5">
         <Link
@@ -237,7 +235,7 @@ function StudentRow({ student }) {
           </button>
           <button
             type="button"
-            onClick={remove}
+            onClick={() => setConfirming(true)}
             disabled={isDeleting}
             aria-label={`Delete ${student.username}`}
             className="flex size-8 items-center justify-center text-stone-500 hover:text-red-600 disabled:opacity-40"
@@ -247,6 +245,16 @@ function StudentRow({ student }) {
         </div>
       </td>
     </tr>
+    {confirming && (
+      <ConfirmModal
+        title="Delete student"
+        message={`Delete ${student.username}? Their course progress is deleted too. This cannot be undone.`}
+        busy={isDeleting}
+        onConfirm={remove}
+        onClose={() => setConfirming(false)}
+      />
+    )}
+  </>
   )
 }
 
@@ -399,7 +407,7 @@ export default function StudentsPage() {
       </main>
 
       {showNewStudent && (
-        <Modal title="New Student" onClose={() => setShowNewStudent(false)}>
+        <Modal title="New Student" size="lg" onClose={() => setShowNewStudent(false)}>
           <AddStudentForm onDone={() => setShowNewStudent(false)} />
         </Modal>
       )}

@@ -5,17 +5,21 @@ import {
   useBulkCreateAgentsMutation,
   useCreateAgentMutation,
   useCreateCohortMutation,
+  useDeleteCohortMutation,
   useGetCohortsQuery,
   useGetStaffQuery,
   useUpdateCohortMutation,
 } from '../../store/onboardingApi.js'
 import { selectOnboardingRole } from '../../store/authSlice.js'
 import {
+  ConfirmModal,
   Field,
+  Modal,
+  PromptModal,
   blackButton,
   inputClass,
-  outlineButton,
 } from '../../components/adminUi.jsx'
+import { TrashIcon } from '../../components/Icons.jsx'
 import { errorMessage } from '../../components/onboarding/StatusPill.jsx'
 import { formatDate } from '../../utils/adminHelpers.js'
 
@@ -26,6 +30,7 @@ export default function CohortsPage() {
   const { data: staff } = useGetStaffQuery()
   const [createCohort] = useCreateCohortMutation()
   const [updateCohort] = useUpdateCohortMutation()
+  const [deleteCohort] = useDeleteCohortMutation()
   const [createAgent] = useCreateAgentMutation()
   const [bulkCreate] = useBulkCreateAgentsMutation()
 
@@ -33,8 +38,12 @@ export default function CohortsPage() {
   const [startDate, setStartDate] = useState('')
   const [names, setNames] = useState('')
   const [ownerId, setOwnerId] = useState('')
+  const [editing, setEditing] = useState(null)
+  const [pendingDelete, setPendingDelete] = useState(null)
+  const [addingTo, setAddingTo] = useState(null)
   const [error, setError] = useState(null)
   const [busy, setBusy] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   const submit = async (e) => {
     e.preventDefault()
@@ -69,18 +78,34 @@ export default function CohortsPage() {
     }
   }
 
-  const addOneToExisting = async (cohort) => {
-    const fullName = window.prompt(`Agent name for ${cohort.name}`)
-    if (!fullName?.trim()) return
+  const addOneToExisting = async (fullName) => {
+    if (!addingTo || !fullName.trim()) return
     setError(null)
     try {
       await createAgent({
         full_name: fullName.trim(),
-        cohort: cohort.id,
-        start_date: cohort.startDate,
+        cohort: addingTo.id,
+        start_date: addingTo.startDate,
       }).unwrap()
+      setAddingTo(null)
     } catch (err) {
       setError(errorMessage(err, 'Could not add that agent.'))
+      setAddingTo(null)
+    }
+  }
+
+  const remove = async () => {
+    if (!pendingDelete) return
+    setError(null)
+    setDeleting(true)
+    try {
+      await deleteCohort(pendingDelete.id).unwrap()
+      setPendingDelete(null)
+    } catch (err) {
+      setError(errorMessage(err, 'Could not delete that cohort.'))
+      setPendingDelete(null)
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -92,7 +117,8 @@ export default function CohortsPage() {
         Cohorts
       </h1>
       <p className="mt-1.5 text-stone-500">
-        Multiple active cohorts stay visible. Historical ones can be archived, not deleted.
+        Multiple active cohorts stay visible. Archive old ones, or delete a cohort to remove
+        it and every agent in it.
       </p>
 
       {isAssistant && (
@@ -153,6 +179,9 @@ export default function CohortsPage() {
       {isError && (
         <p className="mt-8 text-sm font-medium text-red-600">Could not load cohorts.</p>
       )}
+      {!isAssistant && error && (
+        <p className="mt-4 text-sm font-medium text-red-600">{error}</p>
+      )}
       <div className="mt-8 overflow-x-auto border border-stone-200 bg-white">
         <table className="w-full text-left text-sm">
           <thead className="border-b border-stone-200 bg-stone-50">
@@ -161,7 +190,9 @@ export default function CohortsPage() {
               <th className="px-4 py-3 font-medium text-stone-600">Start</th>
               <th className="px-4 py-3 font-medium text-stone-600">Agents</th>
               <th className="px-4 py-3 font-medium text-stone-600">Active</th>
-              <th className="px-4 py-3 font-medium text-stone-600" />
+              <th className="px-4 py-3">
+                <span className="sr-only">Actions</span>
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -173,42 +204,154 @@ export default function CohortsPage() {
                 </td>
                 <td className="px-4 py-3">{cohort.agentCount}</td>
                 <td className="px-4 py-3">{cohort.isActive ? 'Yes' : 'No'}</td>
-                <td className="px-4 py-3 text-right">
-                  <Link
-                    to={`/onboarding/agents?cohort=${cohort.id}`}
-                    className="mr-3 text-xs font-medium text-orange-700"
-                  >
-                    View agents
-                  </Link>
-                  {isAssistant && (
-                    <>
-                      <button
-                        type="button"
-                        className="mr-3 text-xs font-medium text-stone-600"
-                        onClick={() => addOneToExisting(cohort)}
-                      >
-                        Add agent
-                      </button>
-                      <button
-                        type="button"
-                        className="text-xs font-medium text-stone-600"
-                        onClick={() =>
-                          updateCohort({
-                            id: cohort.id,
-                            is_active: !cohort.isActive,
-                          })
-                        }
-                      >
-                        {cohort.isActive ? 'Archive' : 'Reactivate'}
-                      </button>
-                    </>
-                  )}
+                <td className="px-4 py-3">
+                  <div className="flex items-center justify-end gap-1">
+                    <Link
+                      to={`/onboarding/agents?cohort=${cohort.id}`}
+                      className="px-2 py-1.5 font-mono text-[11px] font-semibold tracking-[0.1em] text-orange-700 uppercase hover:text-orange-900"
+                    >
+                      View agents
+                    </Link>
+                    {isAssistant && (
+                      <>
+                        <button
+                          type="button"
+                          className="px-2 py-1.5 font-mono text-[11px] font-semibold tracking-[0.1em] text-stone-600 uppercase hover:text-stone-950"
+                          onClick={() => {
+                            setError(null)
+                            setAddingTo(cohort)
+                          }}
+                        >
+                          Add agent
+                        </button>
+                        <button
+                          type="button"
+                          className="px-2 py-1.5 font-mono text-[11px] font-semibold tracking-[0.1em] text-stone-600 uppercase hover:text-stone-950"
+                          onClick={() => {
+                            setError(null)
+                            setEditing(cohort)
+                          }}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          className="px-2 py-1.5 font-mono text-[11px] font-semibold tracking-[0.1em] text-stone-600 uppercase hover:text-stone-950"
+                          onClick={() =>
+                            updateCohort({
+                              id: cohort.id,
+                              is_active: !cohort.isActive,
+                            })
+                          }
+                        >
+                          {cohort.isActive ? 'Archive' : 'Reactivate'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setError(null)
+                            setPendingDelete(cohort)
+                          }}
+                          aria-label={`Delete ${cohort.name}`}
+                          className="flex size-8 items-center justify-center text-stone-500 hover:text-red-600"
+                        >
+                          <TrashIcon size={16} />
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+      {editing && (
+        <Modal title="Edit cohort" size="md" onClose={() => setEditing(null)}>
+          <EditCohortForm cohort={editing} onDone={() => setEditing(null)} />
+        </Modal>
+      )}
+
+      {addingTo && (
+        <PromptModal
+          title="Add agent"
+          message={`Add an agent to ${addingTo.name}.`}
+          label="Agent name"
+          placeholder="Jane Doe"
+          confirmLabel="Add"
+          onSubmit={addOneToExisting}
+          onClose={() => setAddingTo(null)}
+        />
+      )}
+
+      {pendingDelete && (
+        <ConfirmModal
+          title="Delete cohort"
+          message={
+            pendingDelete.agentCount > 0
+              ? `Delete "${pendingDelete.name}" and its ${pendingDelete.agentCount} agent${pendingDelete.agentCount === 1 ? '' : 's'}? This cannot be undone.`
+              : `Delete "${pendingDelete.name}"? This cannot be undone.`
+          }
+          busy={deleting}
+          onConfirm={remove}
+          onClose={() => setPendingDelete(null)}
+        />
+      )}
     </main>
+  )
+}
+
+function EditCohortForm({ cohort, onDone }) {
+  const [updateCohort] = useUpdateCohortMutation()
+  const [name, setName] = useState(cohort.name)
+  const [startDate, setStartDate] = useState(cohort.startDate || '')
+  const [error, setError] = useState(null)
+  const [busy, setBusy] = useState(false)
+
+  const save = async (e) => {
+    e.preventDefault()
+    if (!name.trim() || !startDate) {
+      setError('Name and start date are required.')
+      return
+    }
+    setBusy(true)
+    setError(null)
+    try {
+      await updateCohort({
+        id: cohort.id,
+        name: name.trim(),
+        start_date: startDate,
+      }).unwrap()
+      onDone()
+    } catch (err) {
+      setError(errorMessage(err, 'Could not save cohort.'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <form onSubmit={save} className="max-w-xl space-y-4">
+      <Field label="Cohort name">
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          className={inputClass}
+        />
+      </Field>
+      <Field label="Start date">
+        <input
+          type="date"
+          value={startDate}
+          onChange={(e) => setStartDate(e.target.value)}
+          className={inputClass}
+        />
+      </Field>
+      {error && <p className="text-sm font-medium text-red-600">{error}</p>}
+      <button type="submit" disabled={busy} className={blackButton}>
+        {busy ? 'Saving…' : 'Save'}
+      </button>
+    </form>
   )
 }

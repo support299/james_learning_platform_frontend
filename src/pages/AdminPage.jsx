@@ -10,6 +10,7 @@ import { formatDate } from '../utils/adminHelpers.js'
 import SiteHeader from '../components/SiteHeader.jsx'
 import { DotsIcon, SearchIcon, ChevronIcon } from '../components/Icons.jsx'
 import {
+  ConfirmModal,
   Modal,
   Field,
   inputClass,
@@ -83,15 +84,21 @@ function AddCourseForm({ onDone }) {
 
 function AdminCourseCard({ course, menuOpen, onToggleMenu }) {
   const [deleteCourse] = useDeleteCourseMutation()
+  const [confirming, setConfirming] = useState(false)
+  const [busy, setBusy] = useState(false)
   const lessonPath = firstLessonPath(course)
   const editPath = `/admin/course/${course.id}`
   const lessonCount = course.lessons?.length ?? course.lessonCount ?? 0
 
   const remove = async () => {
-    if (window.confirm(`Delete "${course.title}" and all its lessons?`)) {
+    setBusy(true)
+    try {
       await deleteCourse(course.id)
+      setConfirming(false)
+      onToggleMenu(null)
+    } finally {
+      setBusy(false)
     }
-    onToggleMenu(null)
   }
 
   return (
@@ -149,12 +156,24 @@ function AdminCourseCard({ course, menuOpen, onToggleMenu }) {
           )}
           <button
             type="button"
-            onClick={remove}
+            onClick={() => {
+              onToggleMenu(null)
+              setConfirming(true)
+            }}
             className="block w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50"
           >
             Delete course
           </button>
         </div>
+      )}
+      {confirming && (
+        <ConfirmModal
+          title="Delete course"
+          message={`Delete "${course.title}" and all its lessons? This cannot be undone.`}
+          busy={busy}
+          onConfirm={remove}
+          onClose={() => setConfirming(false)}
+        />
       )}
     </article>
   )
@@ -413,7 +432,7 @@ export default function AdminPage() {
       </main>
 
       {showNewCourse && (
-        <Modal title="New Course" onClose={() => setShowNewCourse(false)}>
+        <Modal title="New Course" size="lg" onClose={() => setShowNewCourse(false)}>
           <AddCourseForm onDone={() => setShowNewCourse(false)} />
         </Modal>
       )}

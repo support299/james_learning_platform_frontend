@@ -9,6 +9,7 @@ import {
 import { firstLessonPath } from '../data/courses.js'
 import SiteHeader from '../components/SiteHeader.jsx'
 import {
+  ConfirmModal,
   Field,
   inputClass,
   blackButton,
@@ -124,15 +125,15 @@ function LessonRow({
   onMove,
 }) {
   const [deleteLesson] = useDeleteLessonMutation()
+  const [confirming, setConfirming] = useState(false)
   const isQuiz = lesson.type === 'quiz'
   const editPath = isQuiz
     ? `/admin/course/${course.id}/quiz/${lesson.id}/edit`
     : `/admin/course/${course.id}/lesson/${lesson.id}/edit`
 
   const remove = () => {
-    if (window.confirm(`Delete ${isQuiz ? 'quiz' : 'lesson'} "${lesson.title}"?`)) {
-      deleteLesson({ courseId: course.id, lessonId: lesson.id })
-    }
+    deleteLesson({ courseId: course.id, lessonId: lesson.id })
+    setConfirming(false)
   }
 
   return (
@@ -202,13 +203,21 @@ function LessonRow({
         </Link>
         <button
           type="button"
-          onClick={remove}
+          onClick={() => setConfirming(true)}
           aria-label={isQuiz ? 'Delete quiz' : 'Delete lesson'}
           className="flex size-8 items-center justify-center text-stone-400 hover:text-red-600"
         >
           <TrashIcon size={16} />
         </button>
       </span>
+      {confirming && (
+        <ConfirmModal
+          title={isQuiz ? 'Delete quiz' : 'Delete lesson'}
+          message={`Delete "${lesson.title}"? This cannot be undone.`}
+          onConfirm={remove}
+          onClose={() => setConfirming(false)}
+        />
+      )}
     </li>
   )
 }

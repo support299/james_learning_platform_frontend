@@ -5,6 +5,8 @@ import {
   useCreateCarrierMutation,
   useCreateChecklistDefinitionMutation,
   useCreateTemplateMutation,
+  useDeleteCarrierMutation,
+  useDeleteChecklistDefinitionMutation,
   useGetCarriersQuery,
   useGetChecklistDefinitionsQuery,
   useGetSettingsQuery,
@@ -15,11 +17,13 @@ import {
 } from '../../store/onboardingApi.js'
 import { selectOnboardingRole } from '../../store/authSlice.js'
 import {
+  ConfirmModal,
   Field,
   blackButton,
   inputClass,
   outlineButton,
 } from '../../components/adminUi.jsx'
+import { TrashIcon } from '../../components/Icons.jsx'
 import { errorMessage } from '../../components/onboarding/StatusPill.jsx'
 
 export default function SettingsPage() {
@@ -30,7 +34,9 @@ export default function SettingsPage() {
   const { data: templates = [] } = useGetTemplatesQuery()
   const [updateSettings] = useUpdateSettingsMutation()
   const [createCarrier] = useCreateCarrierMutation()
+  const [deleteCarrier] = useDeleteCarrierMutation()
   const [createDefinition] = useCreateChecklistDefinitionMutation()
+  const [deleteDefinition] = useDeleteChecklistDefinitionMutation()
   const [createTemplate] = useCreateTemplateMutation()
   const [updateTemplate] = useUpdateTemplateMutation()
   const [triggerSync, { isLoading: syncing }] = useTriggerSyncMutation()
@@ -39,10 +45,12 @@ export default function SettingsPage() {
   const [overdue, setOverdue] = useState('')
   const [syncEnabled, setSyncEnabled] = useState(true)
   const [carrierName, setCarrierName] = useState('')
+  const [carrierLine, setCarrierLine] = useState('health')
   const [itemLabel, setItemLabel] = useState('')
   const [templateName, setTemplateName] = useState('Default')
   const [error, setError] = useState(null)
   const [notice, setNotice] = useState(null)
+  const [pendingDelete, setPendingDelete] = useState(null)
 
   useEffect(() => {
     if (!settings) return
@@ -75,7 +83,10 @@ export default function SettingsPage() {
     if (!carrierName.trim()) return
     setError(null)
     try {
-      await createCarrier({ name: carrierName.trim() }).unwrap()
+      await createCarrier({
+        name: carrierName.trim(),
+        line: carrierLine,
+      }).unwrap()
       setCarrierName('')
     } catch (err) {
       setError(errorMessage(err, 'Could not add carrier.'))
@@ -94,6 +105,30 @@ export default function SettingsPage() {
       setItemLabel('')
     } catch (err) {
       setError(errorMessage(err, 'Could not add checklist item.'))
+    }
+  }
+
+  const confirmDelete = async () => {
+    if (!pendingDelete) return
+    setError(null)
+    setNotice(null)
+    try {
+      if (pendingDelete.kind === 'carrier') {
+        await deleteCarrier(pendingDelete.item.id).unwrap()
+      } else {
+        await deleteDefinition(pendingDelete.item.id).unwrap()
+      }
+      setPendingDelete(null)
+    } catch (err) {
+      setPendingDelete(null)
+      setError(
+        errorMessage(
+          err,
+          pendingDelete.kind === 'carrier'
+            ? 'Could not delete carrier.'
+            : 'Could not delete checklist item.',
+        ),
+      )
     }
   }
 
@@ -234,25 +269,61 @@ export default function SettingsPage() {
 
       <section className="mt-8 border border-stone-200 bg-white p-6">
         <h2 className="text-lg font-bold">Carriers</h2>
-        <form onSubmit={addCarrier} className="mt-4 flex gap-3">
+        <p className="mt-1 text-sm text-stone-500">
+          Aftermath list is split into Health and Life. You can still add more.
+        </p>
+        <form onSubmit={addCarrier} className="mt-4 flex flex-wrap gap-3">
+          <select
+            value={carrierLine}
+            onChange={(e) => setCarrierLine(e.target.value)}
+            className={inputClass}
+          >
+            <option value="health">Health</option>
+            <option value="life">Life</option>
+          </select>
           <input
             value={carrierName}
             onChange={(e) => setCarrierName(e.target.value)}
-            className={inputClass}
+            className={`${inputClass} min-w-56 flex-1`}
             placeholder="Carrier name"
           />
           <button type="submit" className={blackButton}>
             Add
           </button>
         </form>
-        <ul className="mt-4 text-sm text-stone-700">
-          {carriers.length === 0 && <li className="text-stone-500">None yet.</li>}
-          {carriers.map((c) => (
-            <li key={c.id}>
-              {c.name} <span className="text-stone-400">({c.code})</span>
-            </li>
-          ))}
-        </ul>
+        <div className="mt-6 grid gap-6 sm:grid-cols-2">
+          {['health', 'life'].map((line) => {
+            const rows = carriers.filter((c) => c.line === line)
+            return (
+              <div key={line}>
+                <h3 className="font-mono text-[11px] font-medium tracking-[0.15em] text-stone-500 uppercase">
+                  {line === 'health' ? 'Health carrier list' : 'Life carrier list'}
+                </h3>
+                <ul className="mt-2 text-sm text-stone-700">
+                  {rows.length === 0 && (
+                    <li className="text-stone-400">None yet.</li>
+                  )}
+                  {rows.map((c) => (
+                    <li key={c.id} className="flex items-center justify-between gap-2 py-0.5">
+                      <span>
+                        {c.name}{' '}
+                        <span className="text-stone-400">({c.code})</span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setPendingDelete({ kind: 'carrier', item: c })}
+                        aria-label={`Delete ${c.name}`}
+                        className="flex size-7 shrink-0 items-center justify-center text-stone-400 hover:text-red-600"
+                      >
+                        <TrashIcon size={15} />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )
+          })}
+        </div>
       </section>
 
       <section className="mt-8 border border-stone-200 bg-white p-6">
@@ -271,7 +342,17 @@ export default function SettingsPage() {
         <ul className="mt-4 text-sm text-stone-700">
           {definitions.length === 0 && <li className="text-stone-500">None yet.</li>}
           {definitions.map((d) => (
-            <li key={d.id}>{d.label}</li>
+            <li key={d.id} className="flex items-center justify-between gap-2 py-0.5">
+              <span>{d.label}</span>
+              <button
+                type="button"
+                onClick={() => setPendingDelete({ kind: 'item', item: d })}
+                aria-label={`Delete ${d.label}`}
+                className="flex size-7 shrink-0 items-center justify-center text-stone-400 hover:text-red-600"
+              >
+                <TrashIcon size={15} />
+              </button>
+            </li>
           ))}
         </ul>
       </section>
@@ -293,6 +374,19 @@ export default function SettingsPage() {
           Use current catalog as default template
         </button>
       </section>
+
+      {pendingDelete && (
+        <ConfirmModal
+          title={pendingDelete.kind === 'carrier' ? 'Delete carrier' : 'Delete checklist item'}
+          message={
+            pendingDelete.kind === 'carrier'
+              ? `Delete "${pendingDelete.item.name}"? This cannot be undone.`
+              : `Delete "${pendingDelete.item.label}"? This cannot be undone.`
+          }
+          onConfirm={confirmDelete}
+          onClose={() => setPendingDelete(null)}
+        />
+      )}
     </main>
   )
 }
