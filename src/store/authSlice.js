@@ -50,4 +50,7 @@ export const selectIsStaff = (state) =>
 export const selectStaffKnown = (state) =>
   state.auth.isAdmin !== undefined || state.auth.user?.is_staff !== undefined
 
+export const selectOnboardingRole = (state) =>
+  state.auth.user?.onboarding_role ?? null
+
 export default authSlice.reducer

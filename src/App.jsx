@@ -19,6 +19,14 @@ import LessonEditorPage from './pages/LessonEditorPage.jsx'
 import QuizEditorPage from './pages/QuizEditorPage.jsx'
 import RequireAuth from './components/RequireAuth.jsx'
 import RequireStaff from './components/RequireStaff.jsx'
+import RequireOnboarding from './components/RequireOnboarding.jsx'
+import OnboardingLayout from './components/onboarding/OnboardingLayout.jsx'
+import DashboardPage from './pages/onboarding/DashboardPage.jsx'
+import AgentsPage from './pages/onboarding/AgentsPage.jsx'
+import AgentDetailPage from './pages/onboarding/AgentDetailPage.jsx'
+import CohortsPage from './pages/onboarding/CohortsPage.jsx'
+import AuditPage from './pages/onboarding/AuditPage.jsx'
+import SettingsPage from './pages/onboarding/SettingsPage.jsx'
 import { useLazyGetMeQuery } from './store/authApi.js'
 import { useGhlAutoLoginMutation } from './store/ghlApi.js'
 import {
@@ -75,17 +83,20 @@ function App() {
   }, [logid])
 
   // Sessions restored from localStorage may predate `is_staff` (or have gone
-  // stale since), so refresh the user once on load to settle the admin gate.
+  // stale since), so refresh the user once on load to settle the admin gate
+  // and the isolated onboarding_role.
   const staffUnknown = isAuthed && user?.is_staff === undefined
+  const onboardingUnknown =
+    isAuthed && user?.is_staff && !('onboarding_role' in (user || {}))
   useEffect(() => {
-    if (!staffUnknown) return
+    if (!staffUnknown && !onboardingUnknown) return
     fetchMe()
       .unwrap()
       .then((me) => dispatch(setUser(me)))
       .catch(() => {
         // Token expired or the API is down — RequireAuth/login handles it.
       })
-  }, [staffUnknown, fetchMe, dispatch])
+  }, [staffUnknown, onboardingUnknown, fetchMe, dispatch])
 
   // Hold the routes back while the GHL id is exchanged, so the visitor sees a
   // sign-in splash instead of a flash of the login page they're bypassing.
@@ -110,6 +121,18 @@ function App() {
           path="/course/:courseId/lesson/:lessonId"
           element={<LessonPage />}
         />
+
+        {/* Agent Onboarding Tracker — isolated staff module */}
+        <Route element={<RequireOnboarding />}>
+          <Route path="/onboarding" element={<OnboardingLayout />}>
+            <Route index element={<DashboardPage />} />
+            <Route path="agents" element={<AgentsPage />} />
+            <Route path="agents/:agentId" element={<AgentDetailPage />} />
+            <Route path="cohorts" element={<CohortsPage />} />
+            <Route path="audit" element={<AuditPage />} />
+            <Route path="settings" element={<SettingsPage />} />
+          </Route>
+        </Route>
 
         {/* The admin area additionally requires a staff account */}
         <Route element={<RequireStaff />}>

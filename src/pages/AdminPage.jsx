@@ -17,6 +17,8 @@ import {
   blackButton,
   outlineButton,
 } from '../components/adminUi.jsx'
+import { useSelector } from 'react-redux'
+import { selectOnboardingRole } from '../store/authSlice.js'
 
 const PAGE_SIZE = 6
 
@@ -178,6 +180,7 @@ function NewCourseCard({ onClick }) {
 }
 
 export default function AdminPage() {
+  const onboardingRole = useSelector(selectOnboardingRole)
   const { data: courses = [], isLoading, isError, refetch } =
     useGetCoursesQuery()
   const [showNewCourse, setShowNewCourse] = useState(false)
@@ -249,6 +252,11 @@ export default function AdminPage() {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
+            {onboardingRole && (
+              <Link to="/onboarding" className={outlineButton}>
+                Onboarding
+              </Link>
+            )}
             <Link to="/admin/students" className={outlineButton}>
               Students
             </Link>

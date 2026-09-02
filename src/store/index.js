@@ -5,6 +5,7 @@ import { coursesApi } from './coursesApi.js'
 import { authApi } from './authApi.js'
 import { studentsApi } from './studentsApi.js'
 import { ghlApi } from './ghlApi.js'
+import { onboardingApi } from './onboardingApi.js'
 
 export const store = configureStore({
   reducer: {
@@ -14,6 +15,7 @@ export const store = configureStore({
     [authApi.reducerPath]: authApi.reducer,
     [studentsApi.reducerPath]: studentsApi.reducer,
     [ghlApi.reducerPath]: ghlApi.reducer,
+    [onboardingApi.reducerPath]: onboardingApi.reducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware().concat(
@@ -21,6 +23,7 @@ export const store = configureStore({
       authApi.middleware,
       studentsApi.middleware,
       ghlApi.middleware,
+      onboardingApi.middleware,
     ),
 })
 
