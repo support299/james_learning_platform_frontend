@@ -24,6 +24,7 @@ import OnboardingLayout from './components/onboarding/OnboardingLayout.jsx'
 import DashboardPage from './pages/onboarding/DashboardPage.jsx'
 import AgentsPage from './pages/onboarding/AgentsPage.jsx'
 import AgentDetailPage from './pages/onboarding/AgentDetailPage.jsx'
+import AgentSelfPage from './pages/onboarding/AgentSelfPage.jsx'
 import CohortsPage from './pages/onboarding/CohortsPage.jsx'
 import AuditPage from './pages/onboarding/AuditPage.jsx'
 import SettingsPage from './pages/onboarding/SettingsPage.jsx'
@@ -36,9 +37,22 @@ import {
   selectCurrentUser,
 } from './store/authSlice.js'
 
-// The academy link sent from GoHighLevel arrives as `/?logid={{user.id}}`.
-function logidFrom(search) {
-  return new URLSearchParams(search).get('logid')
+// Agency iframe: /?logid={{user.id}}
+// Location iframe: /?logid={{user.id}}&locationId={{location.id}}
+function ghlLoginFrom(search) {
+  const params = new URLSearchParams(search)
+  return {
+    logid: params.get('logid'),
+    locationId: params.get('locationId') || params.get('location_id') || '',
+  }
+}
+
+function stripGhlLoginParams(search) {
+  const params = new URLSearchParams(search)
+  params.delete('logid')
+  params.delete('locationId')
+  params.delete('location_id')
+  return params.toString()
 }
 
 function App() {
@@ -50,37 +64,42 @@ function App() {
   const location = useLocation()
   const navigate = useNavigate()
   const [autoLogin] = useGhlAutoLoginMutation()
-  const logid = logidFrom(location.search)
+  const { logid, locationId } = ghlLoginFrom(location.search)
   // Seeded from the URL rather than defaulting to false: the exchange only
   // starts after the first paint, and by then RequireAuth would already have
   // bounced a signed-out visitor to /login and lost the id.
   const [signingIn, setSigningIn] = useState(() =>
-    Boolean(logidFrom(window.location.search)),
+    Boolean(ghlLoginFrom(window.location.search).logid),
   )
 
   useEffect(() => {
     if (!logid) return
     setSigningIn(true)
-    autoLogin(logid)
+    autoLogin({ logid, locationId })
       .unwrap()
-      .then((session) => dispatch(setCredentials(session)))
+      .then((session) => {
+        dispatch(setCredentials(session))
+        const rest = stripGhlLoginParams(location.search)
+        const onRoot = location.pathname === '/' || location.pathname === ''
+        const dest =
+          !session.user?.is_staff && onRoot
+            ? `/onboarding/me${rest ? `?${rest}` : ''}`
+            : `${location.pathname}${rest ? `?${rest}` : ''}`
+        navigate(dest, { replace: true })
+      })
       .catch(() => {
         // Unknown or unlinked id — fall through to the normal login page.
-      })
-      .finally(() => {
-        // Drop the id from the address bar so a reload or a bookmark doesn't
-        // repeat the exchange, keeping any other params intact.
-        const params = new URLSearchParams(location.search)
-        params.delete('logid')
-        const rest = params.toString()
+        const rest = stripGhlLoginParams(location.search)
         navigate(`${location.pathname}${rest ? `?${rest}` : ''}`, {
           replace: true,
         })
+      })
+      .finally(() => {
         setSigningIn(false)
       })
-    // Keyed on the id alone: the callbacks above are what change `location`,
-    // and re-running on that would restart the exchange it just finished.
-  }, [logid])
+    // Keyed on the id + location: the callbacks above are what change
+    // `location`, and re-running on that would restart the exchange it just finished.
+  }, [logid, locationId])
 
   // Sessions restored from localStorage may predate `is_staff` (or have gone
   // stale since), so refresh the user once on load to settle the admin gate
@@ -121,6 +140,7 @@ function App() {
           path="/course/:courseId/lesson/:lessonId"
           element={<LessonPage />}
         />
+        <Route path="/onboarding/me" element={<AgentSelfPage />} />
 
         {/* Agent Onboarding Tracker — isolated staff module */}
         <Route element={<RequireOnboarding />}>

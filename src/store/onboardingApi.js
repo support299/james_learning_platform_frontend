@@ -53,6 +53,8 @@ function fromAgent(a) {
   return {
     id: a.id,
     fullName: a.full_name,
+    email: a.email || '',
+    user: fromUser(a.user),
     cohort: a.cohort,
     cohortName: a.cohort_name,
     cohortStartDate: a.cohort_start_date,
@@ -115,6 +117,7 @@ export const onboardingApi = createApi({
     'OnboardingSettings',
     'OnboardingCatalog',
     'OnboardingSync',
+    'OnboardingMe',
   ],
   endpoints: (builder) => ({
     getDashboard: builder.query({
@@ -150,6 +153,20 @@ export const onboardingApi = createApi({
               { type: 'OnboardingAgent', id: 'LIST' },
             ]
           : [{ type: 'OnboardingAgent', id: 'LIST' }],
+    }),
+    getMyOnboarding: builder.query({
+      query: () => 'onboarding/me/',
+      transformResponse: (a) => ({
+        ...fromAgent(a),
+        staff: (a.staff || []).map(fromUser),
+      }),
+      providesTags: (result) =>
+        result
+          ? [
+              { type: 'OnboardingAgent', id: result.id },
+              { type: 'OnboardingMe', id: result.id },
+            ]
+          : ['OnboardingMe'],
     }),
     getAgent: builder.query({
       query: (id) => `onboarding/agents/${id}/`,
@@ -400,6 +417,7 @@ export const onboardingApi = createApi({
 export const {
   useGetDashboardQuery,
   useGetAgentsQuery,
+  useGetMyOnboardingQuery,
   useGetAgentQuery,
   useCreateAgentMutation,
   useUpdateAgentMutation,

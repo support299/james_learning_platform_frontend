@@ -6,35 +6,57 @@ import { CloseIcon, SearchIcon } from './Icons.jsx'
 const MAX_SUGGESTIONS = 8
 
 /**
- * Type-ahead over the connected sub-account's GoHighLevel users.
+ * Type-ahead over GoHighLevel users already synced into our DB.
  *
- * `value` is the chosen user ({id, name, email, role}) or null, and `onChange`
- * gets the same. The id is only ever set by picking a suggestion — an admin
- * typing a name shouldn't have half a name submitted as an id.
+ * Single: `value` is one user ({id, name, email, role}) or null.
+ * Multiple: `value` is an array of those; picking adds, the chip X removes.
  */
-export default function GhlUserPicker({ value, onChange, autoFocus = false }) {
+export default function GhlUserPicker({
+  value,
+  onChange,
+  autoFocus = false,
+  multiple = false,
+  placeholder = 'Start typing a name…',
+}) {
   const [query, setQuery] = useState('')
   const [term, setTerm] = useState('')
   const [open, setOpen] = useState(false)
   const [active, setActive] = useState(0)
 
-  // Debounce so typing doesn't fire a GHL request per keystroke.
+  const selected = multiple ? value ?? [] : value ? [value] : []
+  const selectedIds = new Set(selected.map((u) => u.id))
+
   useEffect(() => {
     const id = setTimeout(() => setTerm(query.trim()), 300)
     return () => clearTimeout(id)
   }, [query])
 
-  // Nothing is fetched until the field is actually in use.
   const { data = [], isFetching, error } = useSearchGhlUsersQuery(term, {
-    skip: !open || value != null,
+    skip: !open || (!multiple && value != null),
   })
-  const suggestions = data.slice(0, MAX_SUGGESTIONS)
+  const suggestions = data
+    .filter((u) => !selectedIds.has(u.id))
+    .slice(0, MAX_SUGGESTIONS)
   const notConnected = error?.status === 404
 
   const choose = (user) => {
+    if (multiple) {
+      onChange([...selected, user])
+      setQuery('')
+      setActive(0)
+      return
+    }
     onChange(user)
     setQuery('')
     setOpen(false)
+  }
+
+  const remove = (id) => {
+    if (multiple) {
+      onChange(selected.filter((u) => u.id !== id))
+    } else {
+      onChange(null)
+    }
   }
 
   const onKeyDown = (e) => {
@@ -48,13 +70,12 @@ export default function GhlUserPicker({ value, onChange, autoFocus = false }) {
       e.preventDefault()
       setActive((i) => (i - 1 + suggestions.length) % suggestions.length)
     } else if (e.key === 'Enter') {
-      // The picker lives inside a form; Enter picks a user, it doesn't submit.
       e.preventDefault()
       choose(suggestions[active])
     }
   }
 
-  if (value) {
+  if (!multiple && value) {
     return (
       <div className="flex items-center justify-between gap-3 border border-stone-300 bg-white px-3.5 py-2.5">
         <div className="min-w-0">
@@ -79,72 +100,96 @@ export default function GhlUserPicker({ value, onChange, autoFocus = false }) {
   }
 
   return (
-    <div className="relative">
-      <div className="flex items-center gap-2.5 border border-stone-300 bg-white px-3.5 text-stone-400 focus-within:border-orange-600">
-        <SearchIcon />
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => {
-            setQuery(e.target.value)
-            setActive(0)
-            setOpen(true)
-          }}
-          // Opens on a click or a keystroke rather than on focus: the field is
-          // focused when the form opens, and that shouldn't call GHL on its own.
-          onClick={() => setOpen(true)}
-          // Suggestions use onMouseDown, so they land before this closes.
-          onBlur={() => setOpen(false)}
-          onKeyDown={onKeyDown}
-          autoFocus={autoFocus}
-          placeholder="Start typing a name…"
-          role="combobox"
-          aria-expanded={open}
-          aria-autocomplete="list"
-          className={`${inputClass} border-0 px-0 focus:border-0`}
-        />
-      </div>
-
-      {open && (
-        <div className="absolute z-10 mt-1 max-h-64 w-full overflow-y-auto border border-stone-300 bg-white shadow-lg">
-          {notConnected ? (
-            <p className="px-3.5 py-3 text-sm text-stone-500">
-              GoHighLevel isn’t connected yet.
-            </p>
-          ) : error ? (
-            <p className="px-3.5 py-3 text-sm text-red-600">
-              Couldn’t reach GoHighLevel.
-            </p>
-          ) : isFetching && !suggestions.length ? (
-            <p className="px-3.5 py-3 text-sm text-stone-500">Searching…</p>
-          ) : !suggestions.length ? (
-            <p className="px-3.5 py-3 text-sm text-stone-500">
-              No GoHighLevel users match “{term}”.
-            </p>
-          ) : (
-            suggestions.map((user, i) => (
+    <div className="space-y-2">
+      {multiple && selected.length > 0 && (
+        <ul className="flex flex-wrap gap-2">
+          {selected.map((user) => (
+            <li
+              key={user.id}
+              className="flex max-w-full items-center gap-2 border border-stone-300 bg-white py-1 pr-1 pl-2.5"
+            >
+              <span className="min-w-0 truncate text-sm text-stone-900">
+                {user.name || user.email || user.id}
+              </span>
               <button
-                key={user.id}
                 type="button"
-                onMouseDown={(e) => e.preventDefault()}
-                onMouseEnter={() => setActive(i)}
-                onClick={() => choose(user)}
-                className={`block w-full px-3.5 py-2.5 text-left ${
-                  i === active ? 'bg-stone-100' : 'hover:bg-stone-50'
-                }`}
+                onClick={() => remove(user.id)}
+                aria-label={`Remove ${user.name || user.email || user.id}`}
+                className="shrink-0 p-1 text-stone-500 hover:text-stone-900"
               >
-                <span className="block truncate text-sm text-stone-900">
-                  {user.name || user.email || user.id}
-                </span>
-                <span className="mt-0.5 block truncate text-xs text-stone-500">
-                  {[user.email, user.role].filter(Boolean).join(' · ') ||
-                    user.id}
-                </span>
+                <CloseIcon size={12} />
               </button>
-            ))
-          )}
-        </div>
+            </li>
+          ))}
+        </ul>
       )}
+      <div className="relative">
+        <div className="flex items-center gap-2.5 border border-stone-300 bg-white px-3.5 text-stone-400 focus-within:border-orange-600">
+          <SearchIcon />
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value)
+              setActive(0)
+              setOpen(true)
+            }}
+            onClick={() => setOpen(true)}
+            onBlur={() => setOpen(false)}
+            onKeyDown={onKeyDown}
+            autoFocus={autoFocus}
+            placeholder={placeholder}
+            role="combobox"
+            aria-expanded={open}
+            aria-autocomplete="list"
+            className={`${inputClass} border-0 px-0 focus:border-0`}
+          />
+        </div>
+
+        {open && (
+          <div className="absolute z-10 mt-1 max-h-64 w-full overflow-y-auto border border-stone-300 bg-white shadow-lg">
+            {notConnected ? (
+              <p className="px-3.5 py-3 text-sm text-stone-500">
+                GoHighLevel isn’t connected yet.
+              </p>
+            ) : error ? (
+              <p className="px-3.5 py-3 text-sm text-red-600">
+                Couldn’t load synced users.
+              </p>
+            ) : isFetching && !suggestions.length ? (
+              <p className="px-3.5 py-3 text-sm text-stone-500">Searching…</p>
+            ) : !suggestions.length ? (
+              <p className="px-3.5 py-3 text-sm text-stone-500">
+                {term
+                  ? `No synced users match “${term}”.`
+                  : 'No synced users yet.'}
+              </p>
+            ) : (
+              suggestions.map((user, i) => (
+                <button
+                  key={user.id}
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onMouseEnter={() => setActive(i)}
+                  onClick={() => choose(user)}
+                  className={`block w-full px-3.5 py-2.5 text-left ${
+                    i === active ? 'bg-stone-100' : 'hover:bg-stone-50'
+                  }`}
+                >
+                  <span className="block truncate text-sm text-stone-900">
+                    {user.name || user.email || user.id}
+                  </span>
+                  <span className="mt-0.5 block truncate text-xs text-stone-500">
+                  {[user.email, user.role, user.locationId]
+                    .filter(Boolean)
+                    .join(' · ') || user.id}
+                  </span>
+                </button>
+              ))
+            )}
+          </div>
+        )}
+      </div>
     </div>
   )
 }

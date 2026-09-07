@@ -15,13 +15,14 @@ import {
   ConfirmModal,
   Field,
   Modal,
-  PromptModal,
   blackButton,
   inputClass,
+  outlineButton,
 } from '../../components/adminUi.jsx'
 import { TrashIcon } from '../../components/Icons.jsx'
 import { errorMessage } from '../../components/onboarding/StatusPill.jsx'
 import { formatDate } from '../../utils/adminHelpers.js'
+import GhlUserPicker from '../../components/GhlUserPicker.jsx'
 
 export default function CohortsPage() {
   const role = useSelector(selectOnboardingRole)
@@ -36,7 +37,7 @@ export default function CohortsPage() {
 
   const [name, setName] = useState('')
   const [startDate, setStartDate] = useState('')
-  const [names, setNames] = useState('')
+  const [picked, setPicked] = useState([])
   const [ownerId, setOwnerId] = useState('')
   const [editing, setEditing] = useState(null)
   const [pendingDelete, setPendingDelete] = useState(null)
@@ -48,42 +49,44 @@ export default function CohortsPage() {
   const submit = async (e) => {
     e.preventDefault()
     setError(null)
-    const agentNames = names
-      .split('\n')
-      .map((row) => row.trim())
-      .filter(Boolean)
     if (!name.trim() || !startDate) {
-      setError('Cohort name and start date are required.')
+      setError('Team name and start date are required.')
       return
     }
     setBusy(true)
     try {
-      if (agentNames.length === 0) {
+      if (picked.length === 0) {
         await createCohort({ name: name.trim(), start_date: startDate }).unwrap()
       } else {
         await bulkCreate({
           cohort_name: name.trim(),
           start_date: startDate,
           owner_id: ownerId ? Number(ownerId) : null,
-          agents: agentNames.map((full_name) => ({ full_name })),
+          agents: picked.map((u) => ({
+            full_name: u.name,
+            email: u.email,
+            ghl_user_id: u.id,
+          })),
         }).unwrap()
       }
       setName('')
       setStartDate('')
-      setNames('')
+      setPicked([])
     } catch (err) {
-      setError(errorMessage(err, 'Could not save the cohort.'))
+      setError(errorMessage(err, 'Could not save the team.'))
     } finally {
       setBusy(false)
     }
   }
 
-  const addOneToExisting = async (fullName) => {
-    if (!addingTo || !fullName.trim()) return
+  const addOneToExisting = async (ghlUser) => {
+    if (!addingTo || !ghlUser) return
     setError(null)
     try {
       await createAgent({
-        full_name: fullName.trim(),
+        full_name: ghlUser.name,
+        email: ghlUser.email || '',
+        ghl_user_id: ghlUser.id,
         cohort: addingTo.id,
         start_date: addingTo.startDate,
       }).unwrap()
@@ -102,7 +105,7 @@ export default function CohortsPage() {
       await deleteCohort(pendingDelete.id).unwrap()
       setPendingDelete(null)
     } catch (err) {
-      setError(errorMessage(err, 'Could not delete that cohort.'))
+      setError(errorMessage(err, 'Could not delete that team.'))
       setPendingDelete(null)
     } finally {
       setDeleting(false)
@@ -114,10 +117,10 @@ export default function CohortsPage() {
   return (
     <main className="mx-auto w-full max-w-6xl px-8 py-10">
       <h1 className="text-4xl font-extrabold tracking-tight text-stone-900">
-        Cohorts
+        Teams
       </h1>
       <p className="mt-1.5 text-stone-500">
-        Multiple active cohorts stay visible. Archive old ones, or delete a cohort to remove
+        Multiple active teams stay visible. Archive old ones, or delete a team to remove
         it and every agent in it.
       </p>
 
@@ -126,9 +129,9 @@ export default function CohortsPage() {
           onSubmit={submit}
           className="mt-8 space-y-4 border border-stone-200 bg-white p-6"
         >
-          <h2 className="text-lg font-bold text-stone-900">New cohort</h2>
+          <h2 className="text-lg font-bold text-stone-900">New team</h2>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Cohort name">
+            <Field label="Team name">
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -159,25 +162,28 @@ export default function CohortsPage() {
               ))}
             </select>
           </Field>
-          <Field label="Agents (one name per line)">
-            <textarea
-              value={names}
-              onChange={(e) => setNames(e.target.value)}
-              rows={5}
-              className={inputClass}
-              placeholder="Jane Doe&#10;John Smith"
+          <Field label="Agents">
+            <GhlUserPicker
+              multiple
+              value={picked}
+              onChange={setPicked}
+              placeholder="Search synced GoHighLevel users…"
             />
+            <p className="mt-1.5 text-xs text-stone-500">
+              Pick people already synced from GoHighLevel. Each one becomes an
+              agent on this team (and an academy login if they have an email).
+            </p>
           </Field>
           {error && <p className="text-sm font-medium text-red-600">{error}</p>}
           <button type="submit" disabled={busy} className={blackButton}>
-            {busy ? 'Saving…' : 'Create cohort'}
+            {busy ? 'Saving…' : 'Create team'}
           </button>
         </form>
       )}
 
-      {isLoading && <p className="mt-8 text-sm text-stone-500">Loading cohorts…</p>}
+      {isLoading && <p className="mt-8 text-sm text-stone-500">Loading teams…</p>}
       {isError && (
-        <p className="mt-8 text-sm font-medium text-red-600">Could not load cohorts.</p>
+        <p className="mt-8 text-sm font-medium text-red-600">Could not load teams.</p>
       )}
       {!isAssistant && error && (
         <p className="mt-4 text-sm font-medium text-red-600">{error}</p>
@@ -186,7 +192,7 @@ export default function CohortsPage() {
         <table className="w-full text-left text-sm">
           <thead className="border-b border-stone-200 bg-stone-50">
             <tr>
-              <th className="px-4 py-3 font-medium text-stone-600">Cohort</th>
+              <th className="px-4 py-3 font-medium text-stone-600">Team</th>
               <th className="px-4 py-3 font-medium text-stone-600">Start</th>
               <th className="px-4 py-3 font-medium text-stone-600">Agents</th>
               <th className="px-4 py-3 font-medium text-stone-600">Active</th>
@@ -268,26 +274,24 @@ export default function CohortsPage() {
       </div>
 
       {editing && (
-        <Modal title="Edit cohort" size="md" onClose={() => setEditing(null)}>
+        <Modal title="Edit team" size="md" onClose={() => setEditing(null)}>
           <EditCohortForm cohort={editing} onDone={() => setEditing(null)} />
         </Modal>
       )}
 
       {addingTo && (
-        <PromptModal
-          title="Add agent"
-          message={`Add an agent to ${addingTo.name}.`}
-          label="Agent name"
-          placeholder="Jane Doe"
-          confirmLabel="Add"
-          onSubmit={addOneToExisting}
-          onClose={() => setAddingTo(null)}
-        />
+        <Modal title="Add agent" size="md" onClose={() => setAddingTo(null)}>
+          <AddAgentForm
+            cohortName={addingTo.name}
+            onSubmit={addOneToExisting}
+            onClose={() => setAddingTo(null)}
+          />
+        </Modal>
       )}
 
       {pendingDelete && (
         <ConfirmModal
-          title="Delete cohort"
+          title="Delete team"
           message={
             pendingDelete.agentCount > 0
               ? `Delete "${pendingDelete.name}" and its ${pendingDelete.agentCount} agent${pendingDelete.agentCount === 1 ? '' : 's'}? This cannot be undone.`
@@ -299,6 +303,44 @@ export default function CohortsPage() {
         />
       )}
     </main>
+  )
+}
+
+function AddAgentForm({ cohortName, onSubmit, onClose }) {
+  const [ghlUser, setGhlUser] = useState(null)
+  const [busy, setBusy] = useState(false)
+
+  const save = async (e) => {
+    e.preventDefault()
+    if (!ghlUser) return
+    setBusy(true)
+    try {
+      await onSubmit(ghlUser)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <form onSubmit={save} className="space-y-4">
+      <p className="text-sm text-stone-600">Add an agent to {cohortName}.</p>
+      <Field label="GoHighLevel user">
+        <GhlUserPicker
+          value={ghlUser}
+          onChange={setGhlUser}
+          autoFocus
+          placeholder="Search synced users…"
+        />
+      </Field>
+      <div className="flex justify-end gap-3">
+        <button type="button" className={outlineButton} onClick={onClose}>
+          Cancel
+        </button>
+        <button type="submit" disabled={busy || !ghlUser} className={blackButton}>
+          {busy ? 'Adding…' : 'Add'}
+        </button>
+      </div>
+    </form>
   )
 }
 
@@ -325,7 +367,7 @@ function EditCohortForm({ cohort, onDone }) {
       }).unwrap()
       onDone()
     } catch (err) {
-      setError(errorMessage(err, 'Could not save cohort.'))
+      setError(errorMessage(err, 'Could not save team.'))
     } finally {
       setBusy(false)
     }
@@ -333,7 +375,7 @@ function EditCohortForm({ cohort, onDone }) {
 
   return (
     <form onSubmit={save} className="max-w-xl space-y-4">
-      <Field label="Cohort name">
+      <Field label="Team name">
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}

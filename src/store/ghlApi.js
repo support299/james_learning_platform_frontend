@@ -11,6 +11,7 @@ function fromApiGhlUser(u) {
     name: u.name || [u.firstName, u.lastName].filter(Boolean).join(' '),
     firstName: u.firstName || first || '',
     lastName: u.lastName || rest.join(' '),
+    locationId: u.locationId || '',
     email: u.email || '',
     phone: u.phone || '',
     role: u.roles?.role || '',
@@ -29,7 +30,6 @@ export const ghlApi = createApi({
           ? `ghl/users/search/?query=${encodeURIComponent(query)}`
           : 'ghl/users/search/',
       transformResponse: (res) => (res.users ?? []).map(fromApiGhlUser),
-      // Typing back and forth over the same few letters shouldn't re-hit GHL.
       keepUnusedDataFor: 120,
     }),
 

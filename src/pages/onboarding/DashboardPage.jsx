@@ -24,7 +24,7 @@ export default function DashboardPage() {
         Onboarding
       </h1>
       <p className="mt-1.5 text-stone-500">
-        Operational view of active cohorts, completion, and items that still need work.
+        Operational view of active teams, completion, and items that still need work.
       </p>
 
       {isLoading && (
@@ -38,7 +38,7 @@ export default function DashboardPage() {
       {data && (
         <>
           <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <Stat label="Active cohorts" value={data.activeCohorts} />
+            <Stat label="Active teams" value={data.activeCohorts} />
             <Stat label="Agents" value={data.agentCount} />
             <Stat
               label="Overall completion"
@@ -57,10 +57,10 @@ export default function DashboardPage() {
           </div>
 
           <section className="mt-10">
-            <h2 className="text-xl font-bold text-stone-900">Active cohorts</h2>
+            <h2 className="text-xl font-bold text-stone-900">Active teams</h2>
             {data.cohorts.length === 0 ? (
               <p className="mt-3 text-sm text-stone-500">
-                No active cohorts yet.{' '}
+                No active teams yet.{' '}
                 <Link to="/onboarding/cohorts" className="text-orange-700">
                   Create one
                 </Link>
@@ -71,7 +71,7 @@ export default function DashboardPage() {
                 <table className="w-full text-left text-sm">
                   <thead className="border-b border-stone-200 bg-stone-50">
                     <tr>
-                      <th className="px-4 py-3 font-medium text-stone-600">Cohort</th>
+                      <th className="px-4 py-3 font-medium text-stone-600">Team</th>
                       <th className="px-4 py-3 font-medium text-stone-600">Start</th>
                       <th className="px-4 py-3 font-medium text-stone-600">Agents</th>
                     </tr>

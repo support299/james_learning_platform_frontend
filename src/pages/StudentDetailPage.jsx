@@ -39,6 +39,19 @@ function StudentSummary({ student }) {
     ['Email', student.email || '—'],
     ['Joined', formatDate(student.dateJoined)],
     ['Last login', formatDate(student.lastLogin)],
+    [
+      'Onboarding',
+      student.onboardingAgent ? (
+        <Link
+          to={`/onboarding/agents/${student.onboardingAgent.id}`}
+          className="text-orange-700 hover:text-orange-900"
+        >
+          {student.onboardingAgent.cohortName || student.onboardingAgent.fullName}
+        </Link>
+      ) : (
+        '—'
+      ),
+    ],
   ]
 
   return (
@@ -53,7 +66,7 @@ function StudentSummary({ student }) {
           </span>
         )}
       </div>
-      <dl className="mt-5 grid gap-4 border-y border-stone-200 py-5 sm:grid-cols-4">
+      <dl className="mt-5 grid gap-4 border-y border-stone-200 py-5 sm:grid-cols-5">
         {facts.map(([label, value]) => (
           <div key={label}>
             <dt className={monoLabel}>{label}</dt>
