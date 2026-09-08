@@ -36,11 +36,18 @@ export const ghlApi = createApi({
     // Public: trades the GHL user id from an academy link's ?logid= for a
     // session. Returns the same {user, access, refresh, is_admin} as /login.
     ghlAutoLogin: builder.mutation({
-      query: (logid) => ({
-        url: 'ghl/autologin/',
-        method: 'POST',
-        body: { logid },
-      }),
+      query: (arg) => {
+        const logid = typeof arg === 'string' ? arg : arg?.logid
+        const locationId =
+          typeof arg === 'string'
+            ? ''
+            : arg?.locationId || arg?.location_id || ''
+        return {
+          url: 'ghl/autologin/',
+          method: 'POST',
+          body: { logid, location_id: locationId || '' },
+        }
+      },
     }),
   }),
 })
