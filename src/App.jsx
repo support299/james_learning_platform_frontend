@@ -17,6 +17,7 @@ import StudentDetailPage from './pages/StudentDetailPage.jsx'
 import CourseEditPage from './pages/CourseEditPage.jsx'
 import LessonEditorPage from './pages/LessonEditorPage.jsx'
 import QuizEditorPage from './pages/QuizEditorPage.jsx'
+import SlideshowEditorPage from './pages/SlideshowEditorPage.jsx'
 import RequireAuth from './components/RequireAuth.jsx'
 import RequireStaff from './components/RequireStaff.jsx'
 import RequireOnboarding from './components/RequireOnboarding.jsx'
@@ -178,6 +179,14 @@ function App() {
           <Route
             path="/admin/course/:courseId/quiz/:lessonId/edit"
             element={<QuizEditorPage />}
+          />
+          <Route
+            path="/admin/course/:courseId/slideshow/new"
+            element={<SlideshowEditorPage />}
+          />
+          <Route
+            path="/admin/course/:courseId/slideshow/:lessonId/edit"
+            element={<SlideshowEditorPage />}
           />
         </Route>
       </Route>

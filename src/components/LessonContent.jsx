@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { CheckCircleIcon, QuizIcon } from './Icons.jsx'
+import SlideshowViewer from './SlideshowViewer.jsx'
 import VideoProgressTracker from './VideoProgressTracker.jsx'
 import { hasVideoEmbed } from '../utils/videoEmbed.js'
 import { useSetLessonCompleteMutation } from '../store/coursesApi.js'
@@ -189,6 +190,10 @@ export default function LessonContent({ lesson, courseId, isCompleted }) {
     return (
       <QuizPlayer lesson={lesson} courseId={courseId} isCompleted={isCompleted} />
     )
+  }
+
+  if (lesson.type === 'slideshow') {
+    return <SlideshowViewer lesson={lesson} courseId={courseId} isCompleted={isCompleted} />
   }
 
   // Whether a lesson has anything to track is a property of its html (does

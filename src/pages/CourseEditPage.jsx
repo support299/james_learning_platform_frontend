@@ -24,12 +24,14 @@ import {
   PlayCircleIcon,
   DocIcon,
   QuizIcon,
+  SlideshowIcon,
   ArrowIcon,
 } from '../components/Icons.jsx'
 
 function lessonIcon(lesson) {
   if (lesson.type === 'text') return <DocIcon />
   if (lesson.type === 'quiz') return <QuizIcon />
+  if (lesson.type === 'slideshow') return <SlideshowIcon />
   return <PlayCircleIcon />
 }
 
@@ -37,6 +39,10 @@ function lessonMeta(lesson) {
   if (lesson.type === 'video') return `Video • ${lesson.duration}`
   if (lesson.type === 'text')
     return lesson.duration ? `Reading • ${lesson.duration}` : 'Lesson'
+  if (lesson.type === 'slideshow') {
+    const count = lesson.slideCount ?? 0
+    return `${count} Slide${count === 1 ? '' : 's'}`
+  }
   return lesson.meta ?? `${lesson.questionCount ?? 0} Questions`
 }
 
@@ -127,9 +133,13 @@ function LessonRow({
   const [deleteLesson] = useDeleteLessonMutation()
   const [confirming, setConfirming] = useState(false)
   const isQuiz = lesson.type === 'quiz'
+  const isSlideshow = lesson.type === 'slideshow'
   const editPath = isQuiz
     ? `/admin/course/${course.id}/quiz/${lesson.id}/edit`
-    : `/admin/course/${course.id}/lesson/${lesson.id}/edit`
+    : isSlideshow
+      ? `/admin/course/${course.id}/slideshow/${lesson.id}/edit`
+      : `/admin/course/${course.id}/lesson/${lesson.id}/edit`
+  const kindLabel = isQuiz ? 'quiz' : isSlideshow ? 'slideshow' : 'lesson'
 
   const remove = () => {
     deleteLesson({ courseId: course.id, lessonId: lesson.id })
@@ -196,7 +206,7 @@ function LessonRow({
         </button>
         <Link
           to={editPath}
-          aria-label={isQuiz ? 'Edit quiz' : 'Edit lesson'}
+          aria-label={`Edit ${kindLabel}`}
           className="flex size-8 items-center justify-center text-stone-400 hover:text-orange-600"
         >
           <PencilIcon size={16} />
@@ -204,7 +214,7 @@ function LessonRow({
         <button
           type="button"
           onClick={() => setConfirming(true)}
-          aria-label={isQuiz ? 'Delete quiz' : 'Delete lesson'}
+          aria-label={`Delete ${kindLabel}`}
           className="flex size-8 items-center justify-center text-stone-400 hover:text-red-600"
         >
           <TrashIcon size={16} />
@@ -212,7 +222,7 @@ function LessonRow({
       </span>
       {confirming && (
         <ConfirmModal
-          title={isQuiz ? 'Delete quiz' : 'Delete lesson'}
+          title={`Delete ${kindLabel}`}
           message={`Delete "${lesson.title}"? This cannot be undone.`}
           onConfirm={remove}
           onClose={() => setConfirming(false)}
@@ -284,6 +294,7 @@ export default function CourseEditPage() {
   const studentPath = firstLessonPath({ ...course, lessons })
   const newLessonPath = `/admin/course/${course.id}/lesson/new`
   const newQuizPath = `/admin/course/${course.id}/quiz/new`
+  const newSlideshowPath = `/admin/course/${course.id}/slideshow/new`
 
   return (
     <Shell>
@@ -325,6 +336,13 @@ export default function CourseEditPage() {
         <div className="flex items-center gap-2">
           <button
             type="button"
+            onClick={() => navigate(newSlideshowPath)}
+            className={outlineButton}
+          >
+            + Add Slideshow
+          </button>
+          <button
+            type="button"
             onClick={() => navigate(newQuizPath)}
             className={outlineButton}
           >
@@ -346,7 +364,7 @@ export default function CourseEditPage() {
             No lessons yet
           </span>
           <span className="text-sm text-stone-500">
-            Add your first lesson or quiz to get started.
+            Add your first lesson, quiz, or slideshow to get started.
           </span>
           <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
             <button
@@ -362,6 +380,13 @@ export default function CourseEditPage() {
               className={outlineButton}
             >
               + Add Quiz
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate(newSlideshowPath)}
+              className={outlineButton}
+            >
+              + Add Slideshow
             </button>
           </div>
         </div>

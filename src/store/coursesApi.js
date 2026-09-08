@@ -11,7 +11,12 @@ function fromApiLessonSummary(l) {
     order: l.order,
     duration: l.duration,
     questionCount: l.question_count,
+    slideCount: l.slide_count,
   }
+}
+
+function fromApiSlide(s) {
+  return { id: s.id, order: s.order, image: s.image, hotspots: s.hotspots ?? [] }
 }
 
 function fromApiLesson(l) {
@@ -30,6 +35,9 @@ function fromApiLesson(l) {
     questionCount: l.question_count,
     meta: l.meta,
     questions: l.questions ?? [],
+    slides: (l.slides ?? []).map(fromApiSlide),
+    importStatus: l.import_status,
+    importError: l.import_error,
   }
 }
 
@@ -75,6 +83,10 @@ function toApiLesson(d) {
   if (d.html !== undefined) body.html = d.html
   if (d.questions !== undefined) body.questions = d.questions
   if (d.meta !== undefined) body.meta = d.meta
+  // Image is read-only/multipart-only — never rides the JSON lesson PATCH.
+  if (d.slides !== undefined) {
+    body.slides = d.slides.map(({ id, order, hotspots }) => ({ id, order, hotspots }))
+  }
   return body
 }
 
@@ -181,6 +193,50 @@ export const coursesApi = createApi({
         { type: 'Course', id: courseId },
         { type: 'Course', id: 'LIST' },
       ],
+    }),
+    // --- Slideshow slides (image add/replace/delete need their own
+    // multipart requests — a File can't ride the JSON lesson PATCH above,
+    // which still carries hotspots/order for existing slides) ------------
+    uploadSlideshowSlide: builder.mutation({
+      query: ({ courseId, lessonId, file }) => {
+        const body = new FormData()
+        body.append('image', file)
+        return { url: `courses/${courseId}/lessons/${lessonId}/slides/`, method: 'POST', body }
+      },
+      transformResponse: fromApiSlide,
+      invalidatesTags: (result, error, { lessonId }) => [{ type: 'Lesson', id: lessonId }],
+    }),
+    replaceSlideshowSlideImage: builder.mutation({
+      query: ({ courseId, lessonId, slideId, file }) => {
+        const body = new FormData()
+        body.append('image', file)
+        return {
+          url: `courses/${courseId}/lessons/${lessonId}/slides/${slideId}/`,
+          method: 'PATCH',
+          body,
+        }
+      },
+      transformResponse: fromApiSlide,
+      invalidatesTags: (result, error, { lessonId }) => [{ type: 'Lesson', id: lessonId }],
+    }),
+    deleteSlideshowSlide: builder.mutation({
+      query: ({ courseId, lessonId, slideId }) => ({
+        url: `courses/${courseId}/lessons/${lessonId}/slides/${slideId}/`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: (result, error, { lessonId }) => [{ type: 'Lesson', id: lessonId }],
+    }),
+    importSlideshowPptx: builder.mutation({
+      query: ({ courseId, lessonId, file }) => {
+        const body = new FormData()
+        body.append('file', file)
+        return {
+          url: `courses/${courseId}/lessons/${lessonId}/import-pptx/`,
+          method: 'POST',
+          body,
+        }
+      },
+      invalidatesTags: (result, error, { lessonId }) => [{ type: 'Lesson', id: lessonId }],
     }),
     // --- Per-user lesson completions -----------------------------------
     getMyCompletions: builder.query({
@@ -304,6 +360,10 @@ export const {
   useCreateLessonMutation,
   useUpdateLessonMutation,
   useDeleteLessonMutation,
+  useUploadSlideshowSlideMutation,
+  useReplaceSlideshowSlideImageMutation,
+  useDeleteSlideshowSlideMutation,
+  useImportSlideshowPptxMutation,
   useGetMyCompletionsQuery,
   useSetLessonCompleteMutation,
   useGetVideoProgressQuery,

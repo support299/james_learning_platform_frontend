@@ -134,6 +134,39 @@ export function QuizIcon({ size = 20 }) {
   )
 }
 
+export function FullscreenIcon({ size = 18 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" {...base} aria-hidden="true">
+      <path d="M8 3H4v4" />
+      <path d="M16 3h4v4" />
+      <path d="M8 21H4v-4" />
+      <path d="M16 21h4v-4" />
+    </svg>
+  )
+}
+
+export function FullscreenExitIcon({ size = 18 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" {...base} aria-hidden="true">
+      <path d="M4 9h4V5" />
+      <path d="M20 9h-4V5" />
+      <path d="M4 15h4v4" />
+      <path d="M20 15h-4v4" />
+    </svg>
+  )
+}
+
+export function SlideshowIcon({ size = 20 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" {...base} aria-hidden="true">
+      <rect x="3" y="4" width="18" height="13" rx="2" />
+      <polygon points="10 8 15 10.5 10 13" />
+      <line x1="8" y1="21" x2="16" y2="21" />
+      <line x1="12" y1="17" x2="12" y2="21" />
+    </svg>
+  )
+}
+
 export function BellIcon({ size = 20 }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" {...base} aria-hidden="true">
