@@ -4,6 +4,7 @@ import {
   useGetLessonQuery,
   useGetMyCompletionsQuery,
   useGetVideoProgressQuery,
+  useGetSlideVisitsQuery,
   useSetLessonCompleteMutation,
 } from '../store/coursesApi.js'
 import LessonSidebar from '../components/LessonSidebar.jsx'
@@ -14,6 +15,19 @@ import { ArrowIcon, CheckCircleIcon } from '../components/Icons.jsx'
 import { hasVideoEmbed } from '../utils/videoEmbed.js'
 
 const VIDEO_COMPLETION_THRESHOLD = 0.95
+
+// Mirrors LessonCompletionView._slideshow_completion_blockers so the button
+// can be disabled up front, before the user even tries.
+function getSlideshowCompletionGate(slides, visitedIds) {
+  const required = slides.filter((s) => s.isRequired)
+  if (required.length === 0) return { eligible: true, reason: null }
+  const remaining = required.filter((s) => !visitedIds.includes(s.id)).length
+  if (remaining === 0) return { eligible: true, reason: null }
+  return {
+    eligible: false,
+    reason: `Visit ${remaining} more required slide${remaining === 1 ? '' : 's'} to unlock this.`,
+  }
+}
 
 // Mirrors the backend's LessonCompletionView eligibility check so the
 // button can be disabled up front, before the user even tries.
@@ -85,6 +99,16 @@ export default function LessonPage() {
   const videoGate = isVideoLesson
     ? getVideoCompletionGate(videoProgress)
     : { eligible: true, reason: null }
+
+  const isSlideshowLesson = lesson?.type === 'slideshow'
+  const { data: visitedSlideIds = [] } = useGetSlideVisitsQuery(
+    { courseId, lessonId },
+    { skip: !isSlideshowLesson },
+  )
+  const slideshowGate = isSlideshowLesson
+    ? getSlideshowCompletionGate(lesson.slides ?? [], visitedSlideIds)
+    : { eligible: true, reason: null }
+  const completionGate = !videoGate.eligible ? videoGate : slideshowGate
 
   if (courseLoading || lessonLoading) {
     return (
@@ -238,8 +262,8 @@ export default function LessonPage() {
             </div>
             {!isQuizLesson && (
               <div className="flex flex-col items-end gap-1.5">
-                {!isCompleted && !videoGate.eligible && (
-                  <p className="text-xs text-gray-500">{videoGate.reason}</p>
+                {!isCompleted && !completionGate.eligible && (
+                  <p className="text-xs text-gray-500">{completionGate.reason}</p>
                 )}
                 {completeError?.data?.detail && (
                   <p className="text-xs text-red-600">
@@ -248,7 +272,7 @@ export default function LessonPage() {
                 )}
                 <button
                   type="button"
-                  disabled={isSaving || (!isCompleted && !videoGate.eligible)}
+                  disabled={isSaving || (!isCompleted && !completionGate.eligible)}
                   onClick={() =>
                     setLessonComplete({
                       courseId: course.id,

@@ -153,6 +153,7 @@ function SlideThumb({ slide, index, isActive, onSelect, onDelete }) {
           <span className="block text-sm font-semibold text-stone-900">Slide {index + 1}</span>
           <span className="block text-xs text-stone-500">
             {slide.hotspots.length} hotspot{slide.hotspots.length === 1 ? '' : 's'}
+            {!slide.isRequired && ' · optional'}
           </span>
         </span>
         <span
@@ -614,21 +615,34 @@ function SlideshowEditor({ course, lesson }) {
                     <span className={monoLabel}>
                       Slide {currentIndex + 1} — click and drag to draw a hotspot
                     </span>
-                    <input
-                      ref={replaceImageInputRef}
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={handleReplaceImageFile}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => replaceImageInputRef.current?.click()}
-                      disabled={replacing}
-                      className="text-sm font-semibold text-stone-600 hover:text-orange-600"
-                    >
-                      Replace image
-                    </button>
+                    <div className="flex items-center gap-4">
+                      <label className="flex items-center gap-1.5 text-sm font-medium text-stone-600">
+                        <input
+                          type="checkbox"
+                          checked={currentSlide.isRequired}
+                          onChange={(e) =>
+                            patchSlide(currentSlide.id, { isRequired: e.target.checked })
+                          }
+                          className="size-4 accent-orange-600"
+                        />
+                        Required to complete
+                      </label>
+                      <input
+                        ref={replaceImageInputRef}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleReplaceImageFile}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => replaceImageInputRef.current?.click()}
+                        disabled={replacing}
+                        className="text-sm font-semibold text-stone-600 hover:text-orange-600"
+                      >
+                        Replace image
+                      </button>
+                    </div>
                   </div>
                   <SlideCanvas
                     slide={currentSlide}
@@ -654,8 +668,8 @@ function SlideshowEditor({ course, lesson }) {
         )}
 
         <p className="mt-6 text-xs text-stone-500">
-          Slide images and deletes save immediately. Title, overview and hotspots save when you
-          click "Save changes".
+          Slide images and deletes save immediately. Title, overview, hotspots and required
+          slides save when you click "Save changes".
         </p>
       </main>
 

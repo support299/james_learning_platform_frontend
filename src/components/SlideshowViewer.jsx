@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { ArrowIcon, FullscreenExitIcon, FullscreenIcon, PlayCircleIcon } from './Icons.jsx'
+import { useMarkSlideVisitedMutation } from '../store/coursesApi.js'
 
-export default function SlideshowViewer({ lesson }) {
+export default function SlideshowViewer({ lesson, courseId }) {
   const slides = lesson.slides ?? []
   const [currentIndex, setCurrentIndex] = useState(0)
   const containerRef = useRef(null)
   const [isFullscreen, setIsFullscreen] = useState(false)
+  const [markVisited] = useMarkSlideVisitedMutation()
 
   // A freshly loaded (or re-imported) lesson should always open on slide 1.
   useEffect(() => setCurrentIndex(0), [lesson.id])
@@ -29,6 +31,14 @@ export default function SlideshowViewer({ lesson }) {
   // A slideshow tops out around a few dozen slides, so a plain map on every
   // render is cheaper than the bookkeeping a memoized version would need.
   const idToIndex = Object.fromEntries(slides.map((s, i) => [s.id, i]))
+  const slide = slides[Math.min(currentIndex, Math.max(slides.length - 1, 0))]
+
+  // Every slide the student actually looks at counts as "visited" — the
+  // backend gates "Mark as Complete" on every *required* slide having one
+  // of these, mirroring how video lessons gate on watch time.
+  useEffect(() => {
+    if (slide) markVisited({ courseId, lessonId: lesson.id, slideId: slide.id })
+  }, [slide, courseId, lesson.id, markVisited])
 
   if (slides.length === 0) {
     return (
@@ -42,7 +52,6 @@ export default function SlideshowViewer({ lesson }) {
     )
   }
 
-  const slide = slides[Math.min(currentIndex, slides.length - 1)]
   const goTo = (index) => {
     if (index >= 0 && index < slides.length) setCurrentIndex(index)
   }

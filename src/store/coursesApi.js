@@ -16,7 +16,13 @@ function fromApiLessonSummary(l) {
 }
 
 function fromApiSlide(s) {
-  return { id: s.id, order: s.order, image: s.image, hotspots: s.hotspots ?? [] }
+  return {
+    id: s.id,
+    order: s.order,
+    image: s.image,
+    hotspots: s.hotspots ?? [],
+    isRequired: s.is_required ?? true,
+  }
 }
 
 function fromApiLesson(l) {
@@ -85,7 +91,12 @@ function toApiLesson(d) {
   if (d.meta !== undefined) body.meta = d.meta
   // Image is read-only/multipart-only — never rides the JSON lesson PATCH.
   if (d.slides !== undefined) {
-    body.slides = d.slides.map(({ id, order, hotspots }) => ({ id, order, hotspots }))
+    body.slides = d.slides.map(({ id, order, hotspots, isRequired }) => ({
+      id,
+      order,
+      hotspots,
+      is_required: isRequired,
+    }))
   }
   return body
 }
@@ -93,7 +104,7 @@ function toApiLesson(d) {
 export const coursesApi = createApi({
   reducerPath: 'coursesApi',
   baseQuery: authBaseQuery,
-  tagTypes: ['Course', 'Lesson', 'Completion', 'VideoProgress'],
+  tagTypes: ['Course', 'Lesson', 'Completion', 'VideoProgress', 'SlideVisit'],
   endpoints: (builder) => ({
     // --- Courses -------------------------------------------------------
     getCourses: builder.query({
@@ -238,6 +249,40 @@ export const coursesApi = createApi({
       },
       invalidatesTags: (result, error, { lessonId }) => [{ type: 'Lesson', id: lessonId }],
     }),
+    // --- Per-user "have they viewed this slide" tracking, gates a
+    // slideshow lesson's completion the same way video watch-time does ---
+    getSlideVisits: builder.query({
+      query: ({ courseId, lessonId }) =>
+        `courses/${courseId}/lessons/${lessonId}/slide-visits/`,
+      // Callers pass courseId/lessonId as both route-param strings and
+      // numeric ids (same mismatch getVideoProgress works around below) —
+      // without this, "12" and 12 would hash to different cache entries.
+      serializeQueryArgs: ({ queryArgs: { courseId, lessonId } }) => `${courseId}:${lessonId}`,
+      transformResponse: (res) => res.visited ?? [],
+      providesTags: (result, error, { lessonId }) => [{ type: 'SlideVisit', id: lessonId }],
+    }),
+    markSlideVisited: builder.mutation({
+      query: ({ courseId, lessonId, slideId }) => ({
+        url: `courses/${courseId}/lessons/${lessonId}/slide-visits/`,
+        method: 'POST',
+        body: { slide: slideId },
+      }),
+      // Patch the cache directly rather than invalidating — this fires on
+      // every slide navigation, and a refetch per slide would be chatty for
+      // no benefit (the shape of the response is fully predictable).
+      async onQueryStarted({ courseId, lessonId, slideId }, { dispatch, queryFulfilled }) {
+        const patch = dispatch(
+          coursesApi.util.updateQueryData('getSlideVisits', { courseId, lessonId }, (draft) => {
+            if (!draft.includes(slideId)) draft.push(slideId)
+          }),
+        )
+        try {
+          await queryFulfilled
+        } catch {
+          patch.undo()
+        }
+      },
+    }),
     // --- Per-user lesson completions -----------------------------------
     getMyCompletions: builder.query({
       query: () => 'me/completions/',
@@ -368,4 +413,6 @@ export const {
   useSetLessonCompleteMutation,
   useGetVideoProgressQuery,
   useReportVideoProgressMutation,
+  useGetSlideVisitsQuery,
+  useMarkSlideVisitedMutation,
 } = coursesApi
