@@ -6,7 +6,7 @@ import { LogoMark } from '../Icons.jsx'
 const links = [
   { to: '/onboarding', label: 'Dashboard', end: true },
   { to: '/onboarding/agents', label: 'Agents' },
-  { to: '/onboarding/cohorts', label: 'Cohorts' },
+  { to: '/onboarding/cohorts', label: 'Teams' },
   { to: '/onboarding/audit', label: 'Friday audit' },
 ]
 

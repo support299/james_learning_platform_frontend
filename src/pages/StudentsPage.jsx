@@ -91,8 +91,8 @@ function AddStudentForm({ onDone }) {
       <Field label="GoHighLevel User (optional)">
         <GhlUserPicker value={ghlUser} onChange={pickGhlUser} autoFocus />
         <p className="mt-1.5 text-xs text-stone-500">
-          Search by name — the details below fill in from the GoHighLevel user
-          you pick. Skip it to create the student by hand.
+          Search by name — the details below fill in from the synced
+          GoHighLevel user you pick. Skip it to create the student by hand.
         </p>
       </Field>
 
@@ -196,6 +196,14 @@ function StudentRow({ student }) {
         {name && (
           <span className="block text-xs text-stone-500">
             {student.username}
+          </span>
+        )}
+        {student.onboardingAgent && (
+          <span className="mt-0.5 block text-xs text-stone-500">
+            Onboarding
+            {student.onboardingAgent.cohortName
+              ? ` · ${student.onboardingAgent.cohortName}`
+              : ''}
           </span>
         )}
       </td>

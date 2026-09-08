@@ -55,17 +55,17 @@ export default function AuditPage() {
         Friday audit
       </h1>
       <p className="mt-1.5 text-stone-500">
-        Everything still incomplete on active cohorts. Flag, comment, or assign an owner without leaving this list.
+        Everything still incomplete on active teams. Flag, comment, or assign an owner without leaving this list.
       </p>
 
       <div className="mt-8 grid gap-3 border-y border-stone-200 py-5 sm:grid-cols-3">
-        <Field label="Cohort">
+        <Field label="Team">
           <select
             value={cohort}
             onChange={(e) => setCohort(e.target.value)}
             className={inputClass}
           >
-            <option value="">Active cohorts</option>
+            <option value="">Active teams</option>
             {(cohorts?.results ?? []).map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
@@ -169,8 +169,12 @@ export default function AuditPage() {
                     )}
                   </td>
                   <td className="px-4 py-3">
-                    <StatusPill status={row.agentStatus} />
-                    <p className="mt-1 font-mono text-[10px] text-stone-500 uppercase">
+                    {row.isFlagged ? <StatusPill status="at_risk" /> : null}
+                    <p
+                      className={`font-mono text-[10px] uppercase ${
+                        row.isFlagged ? 'mt-1 text-stone-500' : 'text-stone-600'
+                      }`}
+                    >
                       {row.status.replaceAll('_', ' ')}
                     </p>
                   </td>

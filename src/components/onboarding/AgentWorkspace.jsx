@@ -1,16 +1,6 @@
-import { useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
-import { useSelector } from 'react-redux'
-import {
-  useGetAgentQuery,
-  useGetStaffQuery,
-  usePatchCarrierRequirementMutation,
-  usePatchChecklistItemMutation,
-  useUpdateAgentMutation,
-} from '../../store/onboardingApi.js'
-import { selectOnboardingRole } from '../../store/authSlice.js'
-import { inputClass, monoLabel, outlineButton } from '../../components/adminUi.jsx'
-import StatusPill, { errorMessage } from '../../components/onboarding/StatusPill.jsx'
+import { Link } from 'react-router-dom'
+import { inputClass, monoLabel, outlineButton } from '../adminUi.jsx'
+import StatusPill from './StatusPill.jsx'
 import { formatDate } from '../../utils/adminHelpers.js'
 
 const carrierStatuses = [
@@ -20,54 +10,28 @@ const carrierStatuses = [
   { value: 'approved', label: 'Approved' },
 ]
 
-function canWrite(role) {
-  return role === 'assistant' || role === 'recruiter'
-}
-
-export default function AgentDetailPage() {
-  const { agentId } = useParams()
-  const role = useSelector(selectOnboardingRole)
-  const writable = canWrite(role)
-  const { data: agent, isLoading, isError } = useGetAgentQuery(agentId)
-  const { data: staff } = useGetStaffQuery()
-  const [patchItem] = usePatchChecklistItemMutation()
-  const [patchCarrier] = usePatchCarrierRequirementMutation()
-  const [updateAgent] = useUpdateAgentMutation()
-  const [error, setError] = useState(null)
-
-  const run = async (fn) => {
-    setError(null)
-    try {
-      await fn()
-    } catch (err) {
-      setError(errorMessage(err, 'Could not save that change.'))
-    }
-  }
-
-  if (isLoading) {
-    return (
-      <main className="px-8 py-10">
-        <p className="text-sm text-stone-500">Loading agent…</p>
-      </main>
-    )
-  }
-  if (isError || !agent) {
-    return (
-      <main className="px-8 py-10">
-        <p className="text-sm font-medium text-red-600">Agent not found.</p>
-        <Link to="/onboarding/agents" className={`${outlineButton} mt-4 inline-block`}>
-          Back
-        </Link>
-      </main>
-    )
-  }
-
+export default function AgentWorkspace({
+  agent,
+  staff = [],
+  writable,
+  error,
+  run,
+  patchItem,
+  patchCarrier,
+  updateAgent,
+  showBack = true,
+  showAtRisk = true,
+  showOutstanding = true,
+  showLoginMeta = true,
+}) {
   return (
-    <main className="mx-auto w-full max-w-5xl px-8 py-10">
-      <Link to="/onboarding/agents" className="text-sm text-stone-500 hover:text-stone-800">
-        ← Agents
-      </Link>
-      <div className="mt-4 flex flex-wrap items-start justify-between gap-4">
+    <>
+      {showBack && (
+        <Link to="/onboarding/agents" className="text-sm text-stone-500 hover:text-stone-800">
+          ← Agents
+        </Link>
+      )}
+      <div className={`flex flex-wrap items-start justify-between gap-4 ${showBack ? 'mt-4' : ''}`}>
         <div>
           <h1 className="text-4xl font-extrabold tracking-tight text-stone-900">
             {agent.fullName}
@@ -76,7 +40,7 @@ export default function AgentDetailPage() {
             {agent.cohortName} · started {formatDate(agent.startDate)}
             {agent.owner ? ` · ${agent.owner.displayName}` : ''}
           </p>
-          {(agent.email || agent.user) && (
+          {showLoginMeta && (agent.email || agent.user) && (
             <p className={`${monoLabel} mt-2`}>
               {agent.email || agent.user.email}
               {agent.user
@@ -95,7 +59,7 @@ export default function AgentDetailPage() {
 
       {error && <p className="mt-4 text-sm font-medium text-red-600">{error}</p>}
 
-      {writable && (
+      {showAtRisk && writable && updateAgent && (
         <label className="mt-4 inline-flex items-center gap-2 text-sm text-stone-700">
           <input
             type="checkbox"
@@ -110,18 +74,20 @@ export default function AgentDetailPage() {
         </label>
       )}
 
-      <section className="mt-8">
-        <h2 className="text-lg font-bold text-stone-900">Outstanding</h2>
-        {agent.outstanding.length === 0 ? (
-          <p className="mt-2 text-sm text-stone-500">Nothing outstanding.</p>
-        ) : (
-          <ul className="mt-2 list-disc pl-5 text-sm text-stone-700">
-            {agent.outstanding.map((item) => (
-              <li key={item}>{item}</li>
-            ))}
-          </ul>
-        )}
-      </section>
+      {showOutstanding && (
+        <section className="mt-8">
+          <h2 className="text-lg font-bold text-stone-900">Outstanding</h2>
+          {agent.outstanding.length === 0 ? (
+            <p className="mt-2 text-sm text-stone-500">Nothing outstanding.</p>
+          ) : (
+            <ul className="mt-2 list-disc pl-5 text-sm text-stone-700">
+              {agent.outstanding.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
 
       <section className="mt-8">
         <h2 className="text-lg font-bold text-stone-900">Checklist</h2>
@@ -215,7 +181,7 @@ export default function AgentDetailPage() {
                     }
                   >
                     <option value="">Owner</option>
-                    {(staff ?? []).map((u) => (
+                    {staff.map((u) => (
                       <option key={u.id} value={u.id}>
                         {u.displayName}
                       </option>
@@ -297,7 +263,7 @@ export default function AgentDetailPage() {
                               }
                             >
                               <option value="">Owner</option>
-                              {(staff ?? []).map((u) => (
+                              {staff.map((u) => (
                                 <option key={u.id} value={u.id}>
                                   {u.displayName}
                                 </option>
@@ -333,6 +299,6 @@ export default function AgentDetailPage() {
           })
         )}
       </section>
-    </main>
+    </>
   )
 }

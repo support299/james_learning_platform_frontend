@@ -73,7 +73,7 @@ export default function AgentsPage() {
           </p>
         </div>
         <Link to="/onboarding/cohorts" className={outlineButton}>
-          Add via cohort
+          Add via team
         </Link>
       </div>
 
@@ -82,11 +82,11 @@ export default function AgentsPage() {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Name"
+            placeholder="Name or email"
             className={inputClass}
           />
         </Field>
-        <Field label="Cohort">
+        <Field label="Team">
           <select
             value={cohort}
             onChange={(e) => setCohort(e.target.value)}
@@ -135,7 +135,7 @@ export default function AgentsPage() {
       {error && <p className="mt-4 text-sm font-medium text-red-600">{error}</p>}
       {!isLoading && rows.length === 0 && (
         <p className="mt-8 text-sm text-stone-500">
-          No agents match these filters. Add a cohort and snapshot requirements from settings.
+          No agents match these filters. Add a team and snapshot requirements from settings.
         </p>
       )}
       {rows.length > 0 && (
@@ -144,7 +144,7 @@ export default function AgentsPage() {
             <thead className="border-b border-stone-200 bg-stone-50">
               <tr>
                 <th className="px-4 py-3 font-medium text-stone-600">Agent</th>
-                <th className="px-4 py-3 font-medium text-stone-600">Cohort</th>
+                <th className="px-4 py-3 font-medium text-stone-600">Team</th>
                 <th className="px-4 py-3 font-medium text-stone-600">Owner</th>
                 <th className="px-4 py-3 font-medium text-stone-600">Complete</th>
                 <th className="px-4 py-3 font-medium text-stone-600">Outstanding</th>
@@ -167,6 +167,11 @@ export default function AgentsPage() {
                     >
                       {agent.fullName}
                     </Link>
+                    {agent.email ? (
+                      <span className="mt-0.5 block text-xs text-stone-500">
+                        {agent.email}
+                      </span>
+                    ) : null}
                   </td>
                   <td className="px-4 py-3 text-stone-600">
                     <span className="block">{agent.cohortName}</span>
@@ -255,6 +260,7 @@ export default function AgentsPage() {
 function EditAgentForm({ agent, cohorts, staff, onDone }) {
   const [updateAgent] = useUpdateAgentMutation()
   const [fullName, setFullName] = useState(agent.fullName)
+  const [email, setEmail] = useState(agent.email || '')
   const [cohortId, setCohortId] = useState(String(agent.cohort || ''))
   const [ownerId, setOwnerId] = useState(agent.owner?.id ? String(agent.owner.id) : '')
   const [startDate, setStartDate] = useState(agent.startDate || '')
@@ -264,7 +270,7 @@ function EditAgentForm({ agent, cohorts, staff, onDone }) {
   const save = async (e) => {
     e.preventDefault()
     if (!fullName.trim() || !cohortId || !startDate) {
-      setError('Name, cohort, and start date are required.')
+      setError('Name, team, and start date are required.')
       return
     }
     setBusy(true)
@@ -273,6 +279,7 @@ function EditAgentForm({ agent, cohorts, staff, onDone }) {
       await updateAgent({
         id: agent.id,
         full_name: fullName.trim(),
+        email: email.trim(),
         cohort: Number(cohortId),
         owner_id: ownerId ? Number(ownerId) : null,
         start_date: startDate,
@@ -294,7 +301,16 @@ function EditAgentForm({ agent, cohorts, staff, onDone }) {
           className={inputClass}
         />
       </Field>
-      <Field label="Cohort">
+      <Field label="Email (academy login)">
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          className={inputClass}
+          placeholder="Optional — creates or links their student account"
+        />
+      </Field>
+      <Field label="Team">
         <select
           value={cohortId}
           onChange={(e) => {

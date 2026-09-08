@@ -22,6 +22,14 @@ function fromApiStudent(s) {
           role: s.ghl_user.role,
         }
       : null,
+    onboardingAgent: s.onboarding_agent
+      ? {
+          id: s.onboarding_agent.id,
+          fullName: s.onboarding_agent.full_name,
+          cohort: s.onboarding_agent.cohort,
+          cohortName: s.onboarding_agent.cohort_name,
+        }
+      : null,
   }
 }
 
