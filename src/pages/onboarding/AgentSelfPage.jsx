@@ -58,6 +58,7 @@ export default function AgentSelfPage() {
           showAtRisk={false}
           showOutstanding={false}
           showLoginMeta={false}
+          showFlags={false}
         />
       </div>
     </main>

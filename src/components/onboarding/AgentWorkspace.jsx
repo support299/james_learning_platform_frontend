@@ -23,6 +23,7 @@ export default function AgentWorkspace({
   showAtRisk = true,
   showOutstanding = true,
   showLoginMeta = true,
+  showFlags = true,
 }) {
   return (
     <>
@@ -123,14 +124,14 @@ export default function AgentWorkspace({
                       {!item.isRequired && (
                         <span className={`${monoLabel} ml-2`}>optional</span>
                       )}
-                      {item.isFlagged && (
+                      {showFlags && item.isFlagged && (
                         <span className="ml-2 font-mono text-[10px] text-amber-700 uppercase">
                           flagged
                         </span>
                       )}
                     </span>
                   </label>
-                  {writable && (
+                  {showFlags && writable && (
                     <button
                       type="button"
                       onClick={() =>
@@ -216,7 +217,9 @@ export default function AgentWorkspace({
                         <th className="px-4 py-3 font-medium text-stone-600">Carrier</th>
                         <th className="px-4 py-3 font-medium text-stone-600">Status</th>
                         <th className="px-4 py-3 font-medium text-stone-600">Owner</th>
-                        <th className="px-4 py-3 font-medium text-stone-600">Flag</th>
+                        {showFlags && (
+                          <th className="px-4 py-3 font-medium text-stone-600">Flag</th>
+                        )}
                       </tr>
                     </thead>
                     <tbody>
@@ -270,25 +273,27 @@ export default function AgentWorkspace({
                               ))}
                             </select>
                           </td>
-                          <td className="px-4 py-3">
-                            {writable && (
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  run(() =>
-                                    patchCarrier({
-                                      agentId: agent.id,
-                                      reqId: req.id,
-                                      is_flagged: !req.isFlagged,
-                                    }).unwrap(),
-                                  )
-                                }
-                                className="text-xs font-medium text-stone-500"
-                              >
-                                {req.isFlagged ? 'Unflag' : 'Flag'}
-                              </button>
-                            )}
-                          </td>
+                          {showFlags && (
+                            <td className="px-4 py-3">
+                              {writable && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    run(() =>
+                                      patchCarrier({
+                                        agentId: agent.id,
+                                        reqId: req.id,
+                                        is_flagged: !req.isFlagged,
+                                      }).unwrap(),
+                                    )
+                                  }
+                                  className="text-xs font-medium text-stone-500"
+                                >
+                                  {req.isFlagged ? 'Unflag' : 'Flag'}
+                                </button>
+                              )}
+                            </td>
+                          )}
                         </tr>
                       ))}
                     </tbody>
