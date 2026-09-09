@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { inputClass, monoLabel, outlineButton } from '../adminUi.jsx'
+import { inputClass, monoLabel } from '../adminUi.jsx'
 import StatusPill from './StatusPill.jsx'
 import { formatDate } from '../../utils/adminHelpers.js'
 
@@ -7,12 +7,17 @@ const carrierStatuses = [
   { value: 'not_started', label: 'Not Started' },
   { value: 'in_progress', label: 'In Progress' },
   { value: 'submitted', label: 'Submitted' },
-  { value: 'approved', label: 'Approved' },
 ]
+
+const carrierStatusLabel = {
+  not_started: 'Not Started',
+  in_progress: 'In Progress',
+  submitted: 'Submitted',
+  approved: 'Approved',
+}
 
 export default function AgentWorkspace({
   agent,
-  staff = [],
   writable,
   error,
   run,
@@ -149,7 +154,7 @@ export default function AgentWorkspace({
                     </button>
                   )}
                 </div>
-                <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                <div className="mt-2">
                   <textarea
                     defaultValue={item.comment}
                     disabled={!writable}
@@ -167,27 +172,6 @@ export default function AgentWorkspace({
                       )
                     }}
                   />
-                  <select
-                    value={item.owner?.id || ''}
-                    disabled={!writable}
-                    className={inputClass}
-                    onChange={(e) =>
-                      run(() =>
-                        patchItem({
-                          agentId: agent.id,
-                          itemId: item.id,
-                          owner_id: e.target.value ? Number(e.target.value) : null,
-                        }).unwrap(),
-                      )
-                    }
-                  >
-                    <option value="">Owner</option>
-                    {staff.map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {u.displayName}
-                      </option>
-                    ))}
-                  </select>
                 </div>
               </li>
             ))}
@@ -216,7 +200,6 @@ export default function AgentWorkspace({
                       <tr>
                         <th className="px-4 py-3 font-medium text-stone-600">Carrier</th>
                         <th className="px-4 py-3 font-medium text-stone-600">Status</th>
-                        <th className="px-4 py-3 font-medium text-stone-600">Owner</th>
                         {showFlags && (
                           <th className="px-4 py-3 font-medium text-stone-600">Flag</th>
                         )}
@@ -227,51 +210,32 @@ export default function AgentWorkspace({
                         <tr key={req.id} className="border-b border-stone-100">
                           <td className="px-4 py-3 font-medium">{req.carrierName}</td>
                           <td className="px-4 py-3">
-                            <select
-                              value={req.status}
-                              disabled={!writable}
-                              className={inputClass}
-                              onChange={(e) =>
-                                run(() =>
-                                  patchCarrier({
-                                    agentId: agent.id,
-                                    reqId: req.id,
-                                    status: e.target.value,
-                                  }).unwrap(),
-                                )
-                              }
-                            >
-                              {carrierStatuses.map((opt) => (
-                                <option key={opt.value} value={opt.value}>
-                                  {opt.label}
-                                </option>
-                              ))}
-                            </select>
-                          </td>
-                          <td className="px-4 py-3">
-                            <select
-                              value={req.owner?.id || ''}
-                              disabled={!writable}
-                              className={inputClass}
-                              onChange={(e) =>
-                                run(() =>
-                                  patchCarrier({
-                                    agentId: agent.id,
-                                    reqId: req.id,
-                                    owner_id: e.target.value
-                                      ? Number(e.target.value)
-                                      : null,
-                                  }).unwrap(),
-                                )
-                              }
-                            >
-                              <option value="">Owner</option>
-                              {staff.map((u) => (
-                                <option key={u.id} value={u.id}>
-                                  {u.displayName}
-                                </option>
-                              ))}
-                            </select>
+                            {req.status === 'approved' ? (
+                              <span className="text-stone-700">
+                                {carrierStatusLabel[req.status]}
+                              </span>
+                            ) : (
+                              <select
+                                value={req.status}
+                                disabled={!writable}
+                                className={inputClass}
+                                onChange={(e) =>
+                                  run(() =>
+                                    patchCarrier({
+                                      agentId: agent.id,
+                                      reqId: req.id,
+                                      status: e.target.value,
+                                    }).unwrap(),
+                                  )
+                                }
+                              >
+                                {carrierStatuses.map((opt) => (
+                                  <option key={opt.value} value={opt.value}>
+                                    {opt.label}
+                                  </option>
+                                ))}
+                              </select>
+                            )}
                           </td>
                           {showFlags && (
                             <td className="px-4 py-3">

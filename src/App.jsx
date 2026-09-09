@@ -38,14 +38,18 @@ import {
   selectCurrentUser,
 } from './store/authSlice.js'
 
-// Agency iframe: /?logid={{user.id}}
-// Location iframe: /?logid={{user.id}}&locationId={{location.id}}
+// Home iframe: /?logid={{user.id}}&locationId={{location.id}} → courses
+// Agent iframe: /agent-user?logid={{user.id}}&locationId={{location.id}} → /onboarding/me
 function ghlLoginFrom(search) {
   const params = new URLSearchParams(search)
   return {
     logid: params.get('logid'),
     locationId: params.get('locationId') || params.get('location_id') || '',
   }
+}
+
+function isAgentUserPath(pathname) {
+  return pathname === '/agent-user' || pathname === '/agent-user/'
 }
 
 function stripGhlLoginParams(search) {
@@ -81,11 +85,9 @@ function App() {
       .then((session) => {
         dispatch(setCredentials(session))
         const rest = stripGhlLoginParams(location.search)
-        const onRoot = location.pathname === '/' || location.pathname === ''
-        const dest =
-          !session.user?.is_staff && onRoot
-            ? `/onboarding/me${rest ? `?${rest}` : ''}`
-            : `${location.pathname}${rest ? `?${rest}` : ''}`
+        const dest = isAgentUserPath(location.pathname)
+          ? `/onboarding/me${rest ? `?${rest}` : ''}`
+          : `${location.pathname}${rest ? `?${rest}` : ''}`
         navigate(dest, { replace: true })
       })
       .catch(() => {
@@ -136,6 +138,10 @@ function App() {
       {/* Everything else requires a logged-in user */}
       <Route element={<RequireAuth />}>
         <Route path="/" element={<CoursesPage />} />
+        <Route
+          path="/agent-user"
+          element={<Navigate to="/onboarding/me" replace />}
+        />
         <Route path="/profile" element={<ProfilePage />} />
         <Route
           path="/course/:courseId/lesson/:lessonId"
