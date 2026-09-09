@@ -48,7 +48,6 @@ export default function AgentSelfPage() {
       <div className="mx-auto w-full max-w-5xl px-8 py-10">
         <AgentWorkspace
           agent={data}
-          staff={data.staff ?? []}
           writable
           error={error}
           run={run}
