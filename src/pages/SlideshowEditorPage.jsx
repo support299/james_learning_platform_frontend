@@ -389,10 +389,6 @@ function SlideshowEditor({ course, lesson }) {
   const prevImportStatus = useRef(lesson.importStatus)
 
   const isPending = lesson.importStatus === 'pending'
-  const { data: polled } = useGetLessonQuery(
-    { courseId: course.id, lessonId: lesson.id },
-    { pollingInterval: isPending ? 2000 : 0, skip: !isPending },
-  )
 
   // Re-seed local slides when an import just finished — never clobber
   // in-progress manual edits otherwise. The `missedReseed` fallback covers
@@ -400,20 +396,19 @@ function SlideshowEditor({ course, lesson }) {
   // an already-'done' lesson with slides that were never pulled into local
   // state — safe because it only fires while `slides` is still empty.
   useEffect(() => {
-    const latest = polled ?? lesson
-    const justFinished = prevImportStatus.current === 'pending' && latest.importStatus === 'done'
+    const justFinished = prevImportStatus.current === 'pending' && lesson.importStatus === 'done'
     const missedReseed =
-      latest.importStatus === 'done' && slides.length === 0 && latest.slides.length > 0
+      lesson.importStatus === 'done' && slides.length === 0 && lesson.slides.length > 0
     if (justFinished || missedReseed) {
-      setSlides(latest.slides)
+      setSlides(lesson.slides)
       setCurrentIndex(0)
       dispatch(coursesApi.util.invalidateTags([{ type: 'Course', id: course.id }]))
     }
-    if (latest.importStatus === 'failed' && prevImportStatus.current === 'pending') {
-      setError(latest.importError || 'Import failed.')
+    if (lesson.importStatus === 'failed' && prevImportStatus.current === 'pending') {
+      setError(lesson.importError || 'Import failed.')
     }
-    prevImportStatus.current = latest.importStatus
-  }, [polled, lesson, dispatch, course.id, slides.length])
+    prevImportStatus.current = lesson.importStatus
+  }, [lesson, dispatch, course.id, slides.length])
 
   const saving = updating
   const dirty =
@@ -740,10 +735,22 @@ export default function SlideshowEditorPage() {
     data: lesson,
     isLoading: lessonLoading,
     isError: lessonError,
+    refetch: refetchLesson,
   } = useGetLessonQuery(
     { courseId, lessonId },
     { skip: !lessonId, refetchOnMountOrArgChange: true },
   )
+
+  // A single query is the only source of truth for import progress — no
+  // second `useGetLessonQuery` subscription in the child component, which
+  // previously relied on both sharing one RTK Query cache entry to stay in
+  // sync. Polling here via a plain interval + refetch() instead of RTK
+  // Query's built-in pollingInterval removes that assumption entirely.
+  useEffect(() => {
+    if (lesson?.importStatus !== 'pending') return
+    const id = setInterval(refetchLesson, 2000)
+    return () => clearInterval(id)
+  }, [lesson?.importStatus, refetchLesson])
 
   if (courseLoading || (lessonId && lessonLoading)) {
     return <Notice>Loading…</Notice>

@@ -1,4 +1,4 @@
-import { describe, test, expect, vi, beforeEach } from 'vitest'
+import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
@@ -101,8 +101,12 @@ beforeEach(() => {
   mockReplaceImageState.isLoading = false
   mockImportPptxState.isLoading = false
   mockGetCourse.mockReturnValue({ data: COURSE, isLoading: false, isError: false })
-  mockGetLesson.mockReturnValue({ data: undefined, isLoading: false, isError: false })
+  mockGetLesson.mockReturnValue({ data: undefined, isLoading: false, isError: false, refetch: vi.fn() })
   window.confirm = vi.fn(() => true)
+})
+
+afterEach(() => {
+  vi.useRealTimers()
 })
 
 describe('SlideshowEditorPage loading/error states', () => {
@@ -380,6 +384,7 @@ describe('SlideshowEditor', () => {
       data: baseLesson({ slides: [slide(1), slide(2)], importStatus: 'pending' }),
       isLoading: false,
       isError: false,
+      refetch: vi.fn(),
     })
     renderPage()
     fireEvent.click(screen.getByLabelText('Delete slide 2'))
@@ -439,6 +444,7 @@ describe('SlideshowEditor', () => {
       data: baseLesson({ slides: [slide(1)], importStatus: 'pending' }),
       isLoading: false,
       isError: false,
+      refetch: vi.fn(),
     })
     renderPage()
     expect(screen.getByText('Importing…')).toBeInTheDocument()
@@ -473,17 +479,52 @@ describe('SlideshowEditor', () => {
   })
 
   test('polling transition from pending to done re-seeds slides and invalidates the Course tag', async () => {
-    const pendingLesson = baseLesson({ slides: [], importStatus: 'pending' })
-    mockGetLesson.mockImplementation((queryArg, options) => {
-      if (options && options.pollingInterval !== undefined) {
-        return { data: baseLesson({ slides: [slide(1), slide(2)], importStatus: 'done' }) }
-      }
-      return { data: pendingLesson, isLoading: false, isError: false }
+    // Simulates what a real refetch() landing mid-poll looks like from this
+    // component's point of view: the `lesson` prop transitions pending ->
+    // done between renders. The interval/refetch plumbing that triggers
+    // that refetch in production is exercised separately (see "polls via
+    // refetch while pending" below); this test is about the re-seed logic.
+    mockGetLesson.mockReturnValue({
+      data: baseLesson({ slides: [], importStatus: 'pending' }),
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
     })
-    renderPage()
-    await waitFor(() => expect(slidesHeading()).toHaveTextContent("Slides (2)"))
+    const { rerender } = renderPage()
+    expect(slidesHeading()).toHaveTextContent('Slides (0)')
+
+    mockGetLesson.mockReturnValue({
+      data: baseLesson({ slides: [slide(1), slide(2)], importStatus: 'done' }),
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    })
+    rerender(
+      <MemoryRouter>
+        <SlideshowEditorPage />
+      </MemoryRouter>,
+    )
+
+    await waitFor(() => expect(slidesHeading()).toHaveTextContent('Slides (2)'))
     expect(invalidateTags).toHaveBeenCalledWith([{ type: 'Course', id: 'course1' }])
     expect(mockDispatch).toHaveBeenCalled()
+  })
+
+  test('polls via refetch() while the import is pending, and stops once it is not', () => {
+    vi.useFakeTimers()
+    const setIntervalSpy = vi.spyOn(global, 'setInterval')
+    const refetch = vi.fn()
+    mockGetLesson.mockReturnValue({
+      data: baseLesson({ slides: [], importStatus: 'pending' }),
+      isLoading: false,
+      isError: false,
+      refetch,
+    })
+    renderPage()
+    expect(setIntervalSpy).toHaveBeenCalledWith(refetch, 2000)
+
+    vi.advanceTimersByTime(6000)
+    expect(refetch).toHaveBeenCalledTimes(3)
   })
 
   test('self-heals when the lesson prop jumps straight to done without ever observing pending locally', async () => {
@@ -511,14 +552,25 @@ describe('SlideshowEditor', () => {
   })
 
   test('polling transition from pending to failed surfaces the error', async () => {
-    const pendingLesson = baseLesson({ slides: [], importStatus: 'pending' })
-    mockGetLesson.mockImplementation((queryArg, options) => {
-      if (options && options.pollingInterval !== undefined) {
-        return { data: baseLesson({ slides: [], importStatus: 'failed', importError: 'bad file' }) }
-      }
-      return { data: pendingLesson, isLoading: false, isError: false }
+    mockGetLesson.mockReturnValue({
+      data: baseLesson({ slides: [], importStatus: 'pending' }),
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
     })
-    renderPage()
+    const { rerender } = renderPage()
+
+    mockGetLesson.mockReturnValue({
+      data: baseLesson({ slides: [], importStatus: 'failed', importError: 'bad file' }),
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    })
+    rerender(
+      <MemoryRouter>
+        <SlideshowEditorPage />
+      </MemoryRouter>,
+    )
     expect(await screen.findByText('bad file')).toBeInTheDocument()
   })
 
