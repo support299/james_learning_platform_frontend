@@ -22,9 +22,9 @@ export default function SlideshowViewer({ lesson, courseId }) {
 
   const toggleFullscreen = () => {
     if (document.fullscreenElement) {
-      document.exitFullscreen()
+      document.exitFullscreen?.()
     } else {
-      containerRef.current?.requestFullscreen()
+      containerRef.current?.requestFullscreen?.()
     }
   }
 

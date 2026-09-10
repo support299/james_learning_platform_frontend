@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
+import { useDispatch } from 'react-redux'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
+  coursesApi,
   useGetCourseQuery,
   useGetLessonQuery,
   useCreateLessonMutation,
@@ -32,18 +34,19 @@ function Notice({ children }) {
   )
 }
 
-function EditorHeader({ course, title, isEdit, backTo, onCancel, onSave, saving, canSave, error }) {
+function EditorHeader({ course, title, isEdit, onCancel, onSave, saving, canSave, error }) {
   return (
     <div className="sticky top-0 z-30 h-16 border-b border-stone-200 bg-white/85 backdrop-blur">
       <div className="mx-auto flex h-16 w-full max-w-5xl items-center justify-between gap-4 px-6">
         <div className="flex min-w-0 items-center gap-3">
-          <Link
-            to={backTo}
+          <button
+            type="button"
+            onClick={onCancel}
             aria-label={`Back to ${course.title}`}
             className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-stone-200 text-stone-600 hover:bg-stone-100"
           >
             <ArrowIcon direction="left" size={16} />
-          </Link>
+          </button>
           <div className="min-w-0">
             <p className="truncate text-xs font-medium text-stone-400">{course.title}</p>
             <h1 className="truncate text-base font-bold tracking-tight text-stone-900">{title}</h1>
@@ -79,6 +82,7 @@ function NewSlideshowForm({ course }) {
   const [error, setError] = useState(null)
 
   const canSave = title.trim() !== '' && !saving
+  const dirty = title.trim() !== '' || overview.trim() !== ''
 
   const save = async () => {
     if (!canSave) return
@@ -94,6 +98,11 @@ function NewSlideshowForm({ course }) {
     }
   }
 
+  const cancel = () => {
+    if (dirty && !window.confirm('Discard unsaved changes?')) return
+    navigate(backTo)
+  }
+
   return (
     <div className="min-h-svh bg-[#f6f5f2]">
       <SiteHeader />
@@ -101,8 +110,7 @@ function NewSlideshowForm({ course }) {
         course={course}
         title="New slideshow"
         isEdit={false}
-        backTo={backTo}
-        onCancel={() => navigate(backTo)}
+        onCancel={cancel}
         onSave={save}
         saving={saving}
         canSave={canSave}
@@ -138,7 +146,7 @@ function NewSlideshowForm({ course }) {
 
 // --- Slide editing (existing lesson) --------------------------------------
 
-function SlideThumb({ slide, index, isActive, onSelect, onDelete }) {
+function SlideThumb({ slide, index, isActive, canDelete, onSelect, onDelete }) {
   return (
     <li>
       <button
@@ -158,13 +166,16 @@ function SlideThumb({ slide, index, isActive, onSelect, onDelete }) {
         </span>
         <span
           role="button"
-          tabIndex={0}
+          tabIndex={canDelete ? 0 : -1}
+          aria-disabled={!canDelete}
           onClick={(e) => {
             e.stopPropagation()
-            onDelete()
+            if (canDelete) onDelete()
           }}
           aria-label={`Delete slide ${index + 1}`}
-          className="flex size-7 shrink-0 items-center justify-center text-stone-400 hover:text-red-600"
+          className={`flex size-7 shrink-0 items-center justify-center text-stone-400 ${
+            canDelete ? 'hover:text-red-600' : 'opacity-30'
+          }`}
         >
           <TrashIcon size={14} />
         </span>
@@ -354,6 +365,7 @@ function SlideCanvas({ slide, otherSlides, onAddHotspot, onRetarget, onDeleteHot
 
 function SlideshowEditor({ course, lesson }) {
   const navigate = useNavigate()
+  const dispatch = useDispatch()
   const backTo = `/admin/course/${course.id}`
   const [updateLesson, { isLoading: updating }] = useUpdateLessonMutation()
   const [uploadSlide, { isLoading: uploading }] = useUploadSlideshowSlideMutation()
@@ -389,12 +401,13 @@ function SlideshowEditor({ course, lesson }) {
     if (prevImportStatus.current === 'pending' && latest.importStatus === 'done') {
       setSlides(latest.slides)
       setCurrentIndex(0)
+      dispatch(coursesApi.util.invalidateTags([{ type: 'Course', id: course.id }]))
     }
     if (latest.importStatus === 'failed' && prevImportStatus.current === 'pending') {
       setError(latest.importError || 'Import failed.')
     }
     prevImportStatus.current = latest.importStatus
-  }, [polled, lesson])
+  }, [polled, lesson, dispatch, course.id])
 
   const saving = updating
   const dirty =
@@ -402,6 +415,21 @@ function SlideshowEditor({ course, lesson }) {
     overview.trim() !== (lesson.overview ?? '') ||
     JSON.stringify(slides) !== JSON.stringify(lesson.slides)
   const canSave = title.trim() !== '' && dirty && !saving
+
+  useEffect(() => {
+    if (!dirty) return
+    const onBeforeUnload = (e) => {
+      e.preventDefault()
+      e.returnValue = ''
+    }
+    window.addEventListener('beforeunload', onBeforeUnload)
+    return () => window.removeEventListener('beforeunload', onBeforeUnload)
+  }, [dirty])
+
+  const cancelToBackTo = () => {
+    if (dirty && !window.confirm('Discard unsaved changes?')) return
+    navigate(backTo)
+  }
 
   const save = async () => {
     if (!canSave) return
@@ -474,9 +502,8 @@ function SlideshowEditor({ course, lesson }) {
     setPendingImportFile(null)
     try {
       await importPptx({ courseId: course.id, lessonId: lesson.id, file }).unwrap()
-      // Polling (above) picks up the pending -> done transition and re-seeds slides.
-    } catch {
-      setError('Could not start the import.')
+    } catch (err) {
+      setError(err?.data?.detail || 'Could not start the import.')
     }
   }
 
@@ -509,8 +536,7 @@ function SlideshowEditor({ course, lesson }) {
         course={course}
         title={isPending ? 'Importing…' : 'Edit slideshow'}
         isEdit
-        backTo={backTo}
-        onCancel={() => navigate(backTo)}
+        onCancel={cancelToBackTo}
         onSave={save}
         saving={saving}
         canSave={canSave}
@@ -568,7 +594,7 @@ function SlideshowEditor({ course, lesson }) {
               disabled={importing || isPending}
               className={`${outlineButton} disabled:cursor-default disabled:opacity-40`}
             >
-              Import from PPTX
+              {importing ? 'Uploading…' : 'Import from PPTX'}
             </button>
             <input
               ref={addSlideInputRef}
@@ -580,10 +606,10 @@ function SlideshowEditor({ course, lesson }) {
             <button
               type="button"
               onClick={() => addSlideInputRef.current?.click()}
-              disabled={uploading}
-              className={`${blackButton} flex items-center gap-1.5`}
+              disabled={uploading || isPending || importing}
+              className={`${blackButton} flex items-center gap-1.5 disabled:cursor-default disabled:opacity-40`}
             >
-              <PlusIcon size={14} /> Add slide
+              <PlusIcon size={14} /> {uploading ? 'Uploading…' : 'Add slide'}
             </button>
           </div>
         </div>
@@ -602,6 +628,7 @@ function SlideshowEditor({ course, lesson }) {
                   slide={slide}
                   index={index}
                   isActive={index === currentIndex}
+                  canDelete={!isPending}
                   onSelect={() => setCurrentIndex(index)}
                   onDelete={() => setConfirmDeleteId(slide.id)}
                 />
@@ -637,14 +664,15 @@ function SlideshowEditor({ course, lesson }) {
                       <button
                         type="button"
                         onClick={() => replaceImageInputRef.current?.click()}
-                        disabled={replacing}
-                        className="text-sm font-semibold text-stone-600 hover:text-orange-600"
+                        disabled={replacing || isPending || importing}
+                        className="text-sm font-semibold text-stone-600 hover:text-orange-600 disabled:cursor-default disabled:opacity-40"
                       >
-                        Replace image
+                        {replacing ? 'Uploading…' : 'Replace image'}
                       </button>
                     </div>
                   </div>
                   <SlideCanvas
+                    key={currentSlide.id}
                     slide={currentSlide}
                     otherSlides={otherSlides}
                     onAddHotspot={(hotspot) =>
