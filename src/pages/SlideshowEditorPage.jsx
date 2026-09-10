@@ -394,11 +394,17 @@ function SlideshowEditor({ course, lesson }) {
     { pollingInterval: isPending ? 2000 : 0, skip: !isPending },
   )
 
-  // Re-seed local slides only when an import just finished — never clobber
-  // in-progress manual edits otherwise.
+  // Re-seed local slides when an import just finished — never clobber
+  // in-progress manual edits otherwise. The `missedReseed` fallback covers
+  // a fresh/reopened editor (or any missed pending->done tick) landing on
+  // an already-'done' lesson with slides that were never pulled into local
+  // state — safe because it only fires while `slides` is still empty.
   useEffect(() => {
     const latest = polled ?? lesson
-    if (prevImportStatus.current === 'pending' && latest.importStatus === 'done') {
+    const justFinished = prevImportStatus.current === 'pending' && latest.importStatus === 'done'
+    const missedReseed =
+      latest.importStatus === 'done' && slides.length === 0 && latest.slides.length > 0
+    if (justFinished || missedReseed) {
       setSlides(latest.slides)
       setCurrentIndex(0)
       dispatch(coursesApi.util.invalidateTags([{ type: 'Course', id: course.id }]))
@@ -407,7 +413,7 @@ function SlideshowEditor({ course, lesson }) {
       setError(latest.importError || 'Import failed.')
     }
     prevImportStatus.current = latest.importStatus
-  }, [polled, lesson, dispatch, course.id])
+  }, [polled, lesson, dispatch, course.id, slides.length])
 
   const saving = updating
   const dirty =
@@ -734,7 +740,10 @@ export default function SlideshowEditorPage() {
     data: lesson,
     isLoading: lessonLoading,
     isError: lessonError,
-  } = useGetLessonQuery({ courseId, lessonId }, { skip: !lessonId })
+  } = useGetLessonQuery(
+    { courseId, lessonId },
+    { skip: !lessonId, refetchOnMountOrArgChange: true },
+  )
 
   if (courseLoading || (lessonId && lessonLoading)) {
     return <Notice>Loading…</Notice>

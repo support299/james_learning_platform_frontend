@@ -486,6 +486,30 @@ describe('SlideshowEditor', () => {
     expect(mockDispatch).toHaveBeenCalled()
   })
 
+  test('self-heals when the lesson prop jumps straight to done without ever observing pending locally', async () => {
+    // Regression: if this component's own tracking ref never caught a
+    // 'pending' tick (e.g. a fast import, or a refetch that lands after
+    // completion), the transition-based re-seed alone would never fire and
+    // the editor would be stuck showing 0 slides despite a real, completed
+    // import. The missedReseed fallback (status done + local slides empty +
+    // server slides non-empty) must catch this independently.
+    mockGetLesson.mockReturnValue({ data: baseLesson({ slides: [], importStatus: 'idle' }), isLoading: false, isError: false })
+    const { rerender } = renderPage()
+    expect(slidesHeading()).toHaveTextContent('Slides (0)')
+
+    mockGetLesson.mockReturnValue({
+      data: baseLesson({ slides: [slide(1), slide(2)], importStatus: 'done' }),
+      isLoading: false,
+      isError: false,
+    })
+    rerender(
+      <MemoryRouter>
+        <SlideshowEditorPage />
+      </MemoryRouter>,
+    )
+    await waitFor(() => expect(slidesHeading()).toHaveTextContent('Slides (2)'))
+  })
+
   test('polling transition from pending to failed surfaces the error', async () => {
     const pendingLesson = baseLesson({ slides: [], importStatus: 'pending' })
     mockGetLesson.mockImplementation((queryArg, options) => {
