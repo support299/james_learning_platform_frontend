@@ -18,6 +18,7 @@ import CourseEditPage from './pages/CourseEditPage.jsx'
 import LessonEditorPage from './pages/LessonEditorPage.jsx'
 import QuizEditorPage from './pages/QuizEditorPage.jsx'
 import SlideshowEditorPage from './pages/SlideshowEditorPage.jsx'
+import ImageLessonEditorPage from './pages/ImageLessonEditorPage.jsx'
 import RequireAuth from './components/RequireAuth.jsx'
 import RequireStaff from './components/RequireStaff.jsx'
 import RequireOnboarding from './components/RequireOnboarding.jsx'
@@ -193,6 +194,10 @@ function App() {
           <Route
             path="/admin/course/:courseId/slideshow/:lessonId/edit"
             element={<SlideshowEditorPage />}
+          />
+          <Route
+            path="/admin/course/:courseId/lesson/:lessonId/image-edit"
+            element={<ImageLessonEditorPage />}
           />
         </Route>
       </Route>

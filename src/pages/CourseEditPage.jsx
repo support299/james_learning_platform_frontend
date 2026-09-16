@@ -1,15 +1,17 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   useGetCourseQuery,
   useUpdateCourseMutation,
   useReorderLessonsMutation,
   useDeleteLessonMutation,
+  useImportCoursePptxMutation,
 } from '../store/coursesApi.js'
 import { firstLessonPath } from '../data/courses.js'
 import SiteHeader from '../components/SiteHeader.jsx'
 import {
   ConfirmModal,
+  Modal,
   Field,
   inputClass,
   blackButton,
@@ -25,6 +27,7 @@ import {
   DocIcon,
   QuizIcon,
   SlideshowIcon,
+  ImageIcon,
   ArrowIcon,
 } from '../components/Icons.jsx'
 
@@ -32,6 +35,7 @@ function lessonIcon(lesson) {
   if (lesson.type === 'text') return <DocIcon />
   if (lesson.type === 'quiz') return <QuizIcon />
   if (lesson.type === 'slideshow') return <SlideshowIcon />
+  if (lesson.type === 'image') return <ImageIcon />
   return <PlayCircleIcon />
 }
 
@@ -42,6 +46,10 @@ function lessonMeta(lesson) {
   if (lesson.type === 'slideshow') {
     const count = lesson.slideCount ?? 0
     return `${count} Slide${count === 1 ? '' : 's'}`
+  }
+  if (lesson.type === 'image') {
+    const count = lesson.hotspotCount ?? 0
+    return count ? `${count} Jump${count === 1 ? '' : 's'}` : 'Image'
   }
   return lesson.meta ?? `${lesson.questionCount ?? 0} Questions`
 }
@@ -134,12 +142,15 @@ function LessonRow({
   const [confirming, setConfirming] = useState(false)
   const isQuiz = lesson.type === 'quiz'
   const isSlideshow = lesson.type === 'slideshow'
+  const isImage = lesson.type === 'image'
   const editPath = isQuiz
     ? `/admin/course/${course.id}/quiz/${lesson.id}/edit`
     : isSlideshow
       ? `/admin/course/${course.id}/slideshow/${lesson.id}/edit`
-      : `/admin/course/${course.id}/lesson/${lesson.id}/edit`
-  const kindLabel = isQuiz ? 'quiz' : isSlideshow ? 'slideshow' : 'lesson'
+      : isImage
+        ? `/admin/course/${course.id}/lesson/${lesson.id}/image-edit`
+        : `/admin/course/${course.id}/lesson/${lesson.id}/edit`
+  const kindLabel = isQuiz ? 'quiz' : isSlideshow ? 'slideshow' : isImage ? 'image lesson' : 'lesson'
 
   const remove = () => {
     deleteLesson({ courseId: course.id, lessonId: lesson.id })
@@ -235,18 +246,31 @@ function LessonRow({
 export default function CourseEditPage() {
   const { courseId } = useParams()
   const navigate = useNavigate()
-  const { data: course, isLoading, isError } = useGetCourseQuery(courseId)
+  const { data: course, isLoading, isError, refetch } = useGetCourseQuery(courseId)
   const [reorderLessons] = useReorderLessonsMutation()
+  const [importCoursePptx, { isLoading: importing }] = useImportCoursePptxMutation()
 
   // Local copy of the lesson order for instant drag feedback; re-synced
   // whenever the server data changes (after add/delete/reorder).
   const [lessons, setLessons] = useState([])
   const [dragIndex, setDragIndex] = useState(null)
   const [overIndex, setOverIndex] = useState(null)
+  const [showImportPicker, setShowImportPicker] = useState(false)
+  const [importMode, setImportMode] = useState(null)
+  const [importError, setImportError] = useState(null)
+  const importInputRef = useRef(null)
 
   useEffect(() => {
     if (course) setLessons(course.lessons)
   }, [course])
+
+  const isPendingImport = course?.importStatus === 'pending'
+
+  useEffect(() => {
+    if (!isPendingImport) return
+    const id = setInterval(refetch, 2000)
+    return () => clearInterval(id)
+  }, [isPendingImport, refetch])
 
   if (isLoading) {
     return (
@@ -289,6 +313,27 @@ export default function CourseEditPage() {
     if (dragIndex !== null && dragIndex !== targetIndex) move(dragIndex, targetIndex)
     setDragIndex(null)
     setOverIndex(null)
+  }
+
+  const pickImportMode = (mode) => {
+    setImportMode(mode)
+    setShowImportPicker(false)
+    importInputRef.current?.click()
+  }
+
+  const handleImportFile = async (e) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file || !importMode) return
+    setImportError(null)
+    try {
+      const result = await importCoursePptx({ courseId: course.id, mode: importMode, file }).unwrap()
+      if (importMode === 'slideshow' && result?.lesson?.id) {
+        navigate(`/admin/course/${course.id}/slideshow/${result.lesson.id}/edit`)
+      }
+    } catch (err) {
+      setImportError(err?.data?.detail || err?.data?.file || err?.data?.mode || 'Could not start the import.')
+    }
   }
 
   const studentPath = firstLessonPath({ ...course, lessons })
@@ -334,6 +379,21 @@ export default function CourseEditPage() {
           </span>
         </h2>
         <div className="flex items-center gap-2">
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".pptx"
+            className="hidden"
+            onChange={handleImportFile}
+          />
+          <button
+            type="button"
+            onClick={() => setShowImportPicker(true)}
+            disabled={importing || isPendingImport}
+            className={`${outlineButton} disabled:cursor-default disabled:opacity-40`}
+          >
+            {importing || isPendingImport ? 'Importing…' : 'Import PPTX'}
+          </button>
           <button
             type="button"
             onClick={() => navigate(newSlideshowPath)}
@@ -357,6 +417,15 @@ export default function CourseEditPage() {
           </button>
         </div>
       </div>
+
+      {importError && (
+        <p className="mb-4 text-sm font-medium text-red-600">{importError}</p>
+      )}
+      {isPendingImport && (
+        <div className="mb-4 border border-stone-300 bg-white px-4 py-3 text-sm text-stone-600">
+          Importing your .pptx — this can take a little while for large decks…
+        </div>
+      )}
 
       {lessons.length === 0 ? (
         <div className="flex w-full flex-col items-center justify-center gap-2 border border-dashed border-stone-300 bg-white/60 px-6 py-14 text-center">
@@ -415,6 +484,35 @@ export default function CourseEditPage() {
             ))}
           </ul>
         </>
+      )}
+
+      {showImportPicker && (
+        <Modal title="Import PPTX" onClose={() => setShowImportPicker(false)} size="sm">
+          <p className="text-sm leading-relaxed text-stone-600">
+            Import every slide as one new slideshow lesson, or as its own lesson with
+            jump points to other lessons in this course.
+          </p>
+          <div className="mt-6 space-y-3">
+            <button
+              type="button"
+              onClick={() => pickImportMode('slideshow')}
+              className="block w-full border border-stone-300 bg-white px-4 py-3 text-left hover:border-stone-500"
+            >
+              <span className="block text-sm font-semibold text-stone-900">Import as slideshow</span>
+              <span className="block text-sm text-stone-500">All slides become one new slideshow lesson.</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => pickImportMode('lesson')}
+              className="block w-full border border-stone-300 bg-white px-4 py-3 text-left hover:border-stone-500"
+            >
+              <span className="block text-sm font-semibold text-stone-900">Import as lesson</span>
+              <span className="block text-sm text-stone-500">
+                Each slide becomes its own lesson, with jump points wired between lessons.
+              </span>
+            </button>
+          </div>
+        </Modal>
       )}
     </Shell>
   )

@@ -12,6 +12,7 @@ function fromApiLessonSummary(l) {
     duration: l.duration,
     questionCount: l.question_count,
     slideCount: l.slide_count,
+    hotspotCount: l.hotspot_count,
   }
 }
 
@@ -42,6 +43,8 @@ function fromApiLesson(l) {
     meta: l.meta,
     questions: l.questions ?? [],
     slides: (l.slides ?? []).map(fromApiSlide),
+    image: l.image,
+    hotspots: l.hotspots ?? [],
     importStatus: l.import_status,
     importError: l.import_error,
   }
@@ -57,6 +60,8 @@ function fromApiCourse(c) {
     updatedAt: c.updated_at,
     lessonCount: c.lesson_count,
     lessons: (c.lessons ?? []).map(fromApiLessonSummary),
+    importStatus: c.import_status,
+    importError: c.import_error,
   }
 }
 
@@ -98,6 +103,7 @@ function toApiLesson(d) {
       is_required: isRequired,
     }))
   }
+  if (d.hotspots !== undefined) body.hotspots = d.hotspots
   return body
 }
 
@@ -247,6 +253,28 @@ export const coursesApi = createApi({
           body,
         }
       },
+      invalidatesTags: (result, error, { lessonId }) => [{ type: 'Lesson', id: lessonId }],
+    }),
+    importCoursePptx: builder.mutation({
+      query: ({ courseId, mode, file }) => {
+        const body = new FormData()
+        body.append('mode', mode)
+        body.append('file', file)
+        return { url: `courses/${courseId}/import-pptx/`, method: 'POST', body }
+      },
+      invalidatesTags: (result, error, { courseId }) => [{ type: 'Course', id: courseId }],
+    }),
+    replaceImageLessonImage: builder.mutation({
+      query: ({ courseId, lessonId, file }) => {
+        const body = new FormData()
+        body.append('image', file)
+        return {
+          url: `courses/${courseId}/lessons/${lessonId}/image/`,
+          method: 'PATCH',
+          body,
+        }
+      },
+      transformResponse: fromApiLesson,
       invalidatesTags: (result, error, { lessonId }) => [{ type: 'Lesson', id: lessonId }],
     }),
     // --- Per-user "have they viewed this slide" tracking, gates a
@@ -409,6 +437,8 @@ export const {
   useReplaceSlideshowSlideImageMutation,
   useDeleteSlideshowSlideMutation,
   useImportSlideshowPptxMutation,
+  useImportCoursePptxMutation,
+  useReplaceImageLessonImageMutation,
   useGetMyCompletionsQuery,
   useSetLessonCompleteMutation,
   useGetVideoProgressQuery,
