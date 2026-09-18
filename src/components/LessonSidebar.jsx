@@ -1,15 +1,18 @@
 import { Link } from 'react-router-dom'
 import { useGetMyCompletionsQuery } from '../store/coursesApi.js'
 import { courseProgress } from '../utils/progress.js'
+import { isSidebarUnlocked } from '../utils/lessonUnlock.js'
 import {
   CheckCircleIcon,
   PlayCircleIcon,
   DocIcon,
   QuizIcon,
+  LockIcon,
 } from './Icons.jsx'
 
-function lessonIcon(lesson, isCompleted) {
+function lessonIcon(lesson, isCompleted, isUnlocked) {
   if (isCompleted) return <CheckCircleIcon />
+  if (!isUnlocked) return <LockIcon />
   if (lesson.type === 'text') return <DocIcon />
   if (lesson.type === 'quiz') return <QuizIcon />
   return <PlayCircleIcon />
@@ -56,6 +59,52 @@ export default function LessonSidebar({ course, activeLessonId }) {
       <nav className="flex-1 py-2">
         {course.lessons.map((lesson, index) => {
           const isActive = lesson.id === activeLessonId
+          // isActive covers the instant a fresh lesson opens, before the
+          // course refetch (triggered by getLesson, see coursesApi.js)
+          // lands course.lastVisitedLesson — isLessonUnlocked handles it
+          // afterward, including on a later visit to the sidebar/course page.
+          const isUnlocked =
+            isActive || isSidebarUnlocked(course, completions, lesson.id)
+          const row = (
+            <>
+              <span
+                className={`mt-0.5 ${
+                  completed[lesson.id]
+                    ? 'text-blue-700'
+                    : isActive
+                      ? 'text-blue-700'
+                      : 'text-gray-400'
+                }`}
+              >
+                {lessonIcon(lesson, completed[lesson.id], isUnlocked)}
+              </span>
+              <span>
+                <span
+                  className={`block text-sm font-semibold ${
+                    isActive ? 'text-blue-700' : 'text-gray-800'
+                  }`}
+                >
+                  {index + 1}. {lesson.title}
+                </span>
+                <span className="block text-xs text-gray-500">
+                  {isUnlocked
+                    ? lessonMeta(lesson)
+                    : 'Complete earlier lessons to unlock'}
+                </span>
+              </span>
+            </>
+          )
+          if (!isUnlocked) {
+            return (
+              <div
+                key={lesson.id}
+                aria-disabled="true"
+                className="flex cursor-default items-start gap-3 border-r-3 border-transparent px-5 py-3.5 opacity-60"
+              >
+                {row}
+              </div>
+            )
+          }
           return (
             <Link
               key={lesson.id}
@@ -67,29 +116,7 @@ export default function LessonSidebar({ course, activeLessonId }) {
                   : 'border-transparent hover:bg-gray-50'
               }`}
             >
-              <span
-                className={`mt-0.5 ${
-                  completed[lesson.id]
-                    ? 'text-blue-700'
-                    : isActive
-                      ? 'text-blue-700'
-                      : 'text-gray-400'
-                }`}
-              >
-                {lessonIcon(lesson, completed[lesson.id])}
-              </span>
-              <span>
-                <span
-                  className={`block text-sm font-semibold ${
-                    isActive ? 'text-blue-700' : 'text-gray-800'
-                  }`}
-                >
-                  {index + 1}. {lesson.title}
-                </span>
-                <span className="block text-xs text-gray-500">
-                  {lessonMeta(lesson)}
-                </span>
-              </span>
+              {row}
             </Link>
           )
         })}

@@ -11,8 +11,9 @@ import LessonSidebar from '../components/LessonSidebar.jsx'
 import LessonContent from '../components/LessonContent.jsx'
 import SiteHeader from '../components/SiteHeader.jsx'
 import SiteFooter from '../components/SiteFooter.jsx'
-import { ArrowIcon, CheckCircleIcon } from '../components/Icons.jsx'
+import { ArrowIcon, CheckCircleIcon, LockIcon } from '../components/Icons.jsx'
 import { hasVideoEmbed } from '../utils/videoEmbed.js'
+import { isLessonUnlocked, furthestCompletedLesson } from '../utils/lessonUnlock.js'
 
 const VIDEO_COMPLETION_THRESHOLD = 0.95
 
@@ -153,9 +154,41 @@ export default function LessonPage() {
   // LessonContent.jsx) — the generic Mark as Complete button below is only
   // for video/text lessons.
   const isQuizLesson = lesson.type === 'quiz'
-  // Video lessons must be marked complete before the student can move on;
-  // other lesson types navigate forward freely as before.
-  const nextBlocked = isVideoLesson && !isCompleted
+  // Every lesson type must be completed before the student can move on —
+  // Next/hotspot only ever advance out of an already-completed lesson.
+  const nextBlocked = !isCompleted
+
+  // A lesson reached by typing/bookmarking its URL directly (rather than
+  // clicking Next or a hotspot from an unlocked lesson) is only viewable
+  // once every earlier lesson in the course is completed — this is the
+  // same rule Next/hotspot enforce, just applied to arbitrary entry.
+  if (!isLessonUnlocked(course, completions, lesson.id)) {
+    const backTo = furthestCompletedLesson(course, completions)
+    return (
+      <Shell>
+        <div className="py-20 text-center">
+          <span className="mx-auto mb-3 flex size-12 items-center justify-center rounded-full bg-gray-100 text-gray-400">
+            <LockIcon size={24} />
+          </span>
+          <h1 className="text-2xl font-bold text-gray-900">
+            Complete earlier lessons first
+          </h1>
+          <p className="mt-1 text-sm text-gray-500">
+            You'll need to finish the lessons before this one before you can
+            view it.
+          </p>
+          {backTo && (
+            <Link
+              to={`/course/${course.id}/lesson/${backTo.id}`}
+              className="mt-4 inline-block rounded-lg border border-gray-200 px-5 py-2.5 text-sm font-semibold text-gray-900 hover:bg-gray-50"
+            >
+              Back to {backTo.title}
+            </Link>
+          )}
+        </div>
+      </Shell>
+    )
+  }
 
   const navButtonClass =
     'flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-5 py-2.5 text-sm font-semibold text-gray-900 hover:bg-gray-50 disabled:cursor-default disabled:opacity-40'
@@ -192,6 +225,7 @@ export default function LessonPage() {
             lesson={lesson}
             courseId={course.id}
             isCompleted={isCompleted}
+            course={course}
           />
 
           <div className="space-y-5 py-7">

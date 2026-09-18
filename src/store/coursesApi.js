@@ -62,6 +62,9 @@ function fromApiCourse(c) {
     lessons: (c.lessons ?? []).map(fromApiLessonSummary),
     importStatus: c.import_status,
     importError: c.import_error,
+    // The requesting student's in-progress lesson id (or null) — lets the
+    // sidebar/nav "currently open" gate exception survive a page refresh.
+    lastVisitedLesson: c.last_visited_lesson,
   }
 }
 
@@ -176,6 +179,18 @@ export const coursesApi = createApi({
       providesTags: (result, error, { lessonId }) => [
         { type: 'Lesson', id: lessonId },
       ],
+      // Viewing a lesson records it server-side as the course's
+      // last_visited_lesson (see LessonViewSet.retrieve) — refetch the
+      // course so the sidebar's "currently open" unlock exception picks up
+      // the new value instead of only reflecting it after a hard refresh.
+      async onQueryStarted({ courseId }, { dispatch, queryFulfilled }) {
+        try {
+          await queryFulfilled
+          dispatch(coursesApi.util.invalidateTags([{ type: 'Course', id: courseId }]))
+        } catch {
+          // Lesson fetch failed; nothing to reconcile.
+        }
+      },
     }),
     createLesson: builder.mutation({
       query: ({ courseId, lesson }) => ({

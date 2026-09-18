@@ -186,7 +186,7 @@ function QuizPlayer({ lesson, courseId, isCompleted }) {
   )
 }
 
-export default function LessonContent({ lesson, courseId, isCompleted }) {
+export default function LessonContent({ lesson, courseId, isCompleted, course }) {
   if (lesson.type === 'quiz') {
     return (
       <QuizPlayer lesson={lesson} courseId={courseId} isCompleted={isCompleted} />
@@ -198,7 +198,7 @@ export default function LessonContent({ lesson, courseId, isCompleted }) {
   }
 
   if (lesson.type === 'image') {
-    return <ImageLessonViewer lesson={lesson} courseId={courseId} />
+    return <ImageLessonViewer lesson={lesson} courseId={courseId} course={course} />
   }
 
   // Whether a lesson has anything to track is a property of its html (does
