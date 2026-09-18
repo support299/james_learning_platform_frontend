@@ -1,7 +1,13 @@
-import { NavLink, Outlet, Link } from 'react-router-dom'
-import { useSelector } from 'react-redux'
-import { selectCurrentUser, selectOnboardingRole } from '../../store/authSlice.js'
+import { NavLink, Outlet, Link, useNavigate } from 'react-router-dom'
+import { useDispatch, useSelector } from 'react-redux'
+import {
+  logout,
+  selectCurrentUser,
+  selectIsStaff,
+  selectOnboardingRole,
+} from '../../store/authSlice.js'
 import { LogoMark } from '../Icons.jsx'
+import AccountMenu from '../AccountMenu.jsx'
 
 const links = [
   { to: '/onboarding', label: 'Dashboard', end: true },
@@ -11,9 +17,17 @@ const links = [
 ]
 
 export default function OnboardingLayout() {
+  const dispatch = useDispatch()
+  const navigate = useNavigate()
   const user = useSelector(selectCurrentUser)
+  const isAdmin = useSelector(selectIsStaff)
   const role = useSelector(selectOnboardingRole)
   const isAssistant = role === 'assistant'
+
+  const signOut = () => {
+    dispatch(logout())
+    navigate('/')
+  }
 
   return (
     <div className="flex min-h-svh bg-[#f6f5f2]">
@@ -61,17 +75,14 @@ export default function OnboardingLayout() {
             </NavLink>
           )}
         </nav>
-        <div className="border-t border-stone-200 p-4">
-          <p className="truncate text-xs text-stone-500">{user?.username}</p>
-          <p className="font-mono text-[10px] tracking-[0.14em] text-stone-400 uppercase">
-            {role}
-          </p>
-          <Link
-            to="/admin"
-            className="mt-3 inline-block text-xs font-medium text-orange-700 hover:text-orange-800"
-          >
-            ← Academy admin
-          </Link>
+        <div className="border-t border-stone-200 p-3">
+          <AccountMenu
+            user={user}
+            isAdmin={isAdmin}
+            onboardingRole={role}
+            onLogout={signOut}
+            direction="up"
+          />
         </div>
       </aside>
       <div className="min-w-0 flex-1">
