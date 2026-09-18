@@ -31,7 +31,11 @@ export default function OnboardingLayout() {
 
   return (
     <div className="flex min-h-svh bg-[#f6f5f2]">
-      <aside className="flex w-60 shrink-0 flex-col border-r border-stone-200 bg-white">
+      {/* sticky + h-svh: pins the sidebar (and its bottom AccountMenu) to the
+          viewport regardless of how tall the page in <Outlet/> is — without
+          this, a long page like Settings stretches the flex row and pushes
+          the account menu far below the fold. */}
+      <aside className="sticky top-0 flex h-svh w-60 shrink-0 flex-col overflow-y-auto border-r border-stone-200 bg-white">
         <div className="border-b border-stone-200 px-5 py-5">
           <Link to="/onboarding" className="flex items-center gap-2.5">
             <LogoMark size={28} className="text-[#0b0b0b]" />
