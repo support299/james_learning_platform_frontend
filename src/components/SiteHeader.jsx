@@ -80,6 +80,32 @@ function ProfileMenu({ user, isAdmin, onLogout }) {
             Profile
           </Link>
 
+          {isAdmin && (
+            <div className="mt-1 border-t border-gray-100 pt-1">
+              <p className="px-3 pt-1 pb-1 text-[11px] font-bold tracking-widest text-gray-400 uppercase">
+                Admin
+              </p>
+              <Link
+                to="/admin"
+                role="menuitem"
+                onClick={() => setOpen(false)}
+                className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                <DocIcon size={16} />
+                Courses
+              </Link>
+              <Link
+                to="/admin/students"
+                role="menuitem"
+                onClick={() => setOpen(false)}
+                className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                <UserIcon size={16} />
+                Students
+              </Link>
+            </div>
+          )}
+
           {/* An admin's logo now points at /admin, so this is their way back
               to the student-facing catalog. */}
           {isAdmin && (
