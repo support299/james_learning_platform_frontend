@@ -1,16 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { UserIcon, DocIcon, CheckCircleIcon } from './Icons.jsx'
+import { UserIcon, DocIcon, CheckCircleIcon, LockIcon } from './Icons.jsx'
 
-// Shared account dropdown — used as a drop-down from SiteHeader (top right,
-// every student/admin page) and as a drop-up from OnboardingLayout (bottom
-// left of the onboarding module's sidebar, which has no SiteHeader of its
-// own). Same menu content either way; `direction` only flips which side of
-// the trigger the panel opens toward.
 export default function AccountMenu({
   user,
   isAdmin,
   onboardingRole,
+  isSuperadmin,
   onLogout,
   direction = 'down',
 }) {
@@ -112,11 +108,17 @@ export default function AccountMenu({
                 <UserIcon size={16} />
                 Students
               </Link>
-              {/* onboardingRole is non-null for assistant/recruiter/leadership
-                  — and for superusers too, who auto-count as assistant (see
-                  onboarding/permissions.py onboarding_role()). Staff with no
-                  onboarding group at all get no link here, matching
-                  RequireOnboarding's own gate. */}
+              {isSuperadmin && (
+                <Link
+                  to="/admin/users"
+                  role="menuitem"
+                  onClick={() => setOpen(false)}
+                  className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  <LockIcon size={16} />
+                  Admin users
+                </Link>
+              )}
               {onboardingRole && (
                 <Link
                   to="/onboarding"

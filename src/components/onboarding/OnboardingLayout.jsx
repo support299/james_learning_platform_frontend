@@ -5,6 +5,7 @@ import {
   selectCurrentUser,
   selectIsStaff,
   selectOnboardingRole,
+  selectIsSuperadmin,
 } from '../../store/authSlice.js'
 import { LogoMark } from '../Icons.jsx'
 import AccountMenu from '../AccountMenu.jsx'
@@ -22,6 +23,7 @@ export default function OnboardingLayout() {
   const user = useSelector(selectCurrentUser)
   const isAdmin = useSelector(selectIsStaff)
   const role = useSelector(selectOnboardingRole)
+  const isSuperadmin = useSelector(selectIsSuperadmin)
   const isAssistant = role === 'assistant'
 
   const signOut = () => {
@@ -31,10 +33,6 @@ export default function OnboardingLayout() {
 
   return (
     <div className="flex min-h-svh bg-[#f6f5f2]">
-      {/* sticky + h-svh: pins the sidebar (and its bottom AccountMenu) to the
-          viewport regardless of how tall the page in <Outlet/> is — without
-          this, a long page like Settings stretches the flex row and pushes
-          the account menu far below the fold. */}
       <aside className="sticky top-0 flex h-svh w-60 shrink-0 flex-col overflow-y-auto border-r border-stone-200 bg-white">
         <div className="border-b border-stone-200 px-5 py-5">
           <Link to="/onboarding" className="flex items-center gap-2.5">
@@ -84,6 +82,7 @@ export default function OnboardingLayout() {
             user={user}
             isAdmin={isAdmin}
             onboardingRole={role}
+            isSuperadmin={isSuperadmin}
             onLogout={signOut}
             direction="up"
           />

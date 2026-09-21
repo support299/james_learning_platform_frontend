@@ -13,6 +13,7 @@ import LoginPage from './pages/LoginPage.jsx'
 import ProfilePage from './pages/ProfilePage.jsx'
 import AdminPage from './pages/AdminPage.jsx'
 import StudentsPage from './pages/StudentsPage.jsx'
+import AdminUsersPage from './pages/AdminUsersPage.jsx'
 import StudentDetailPage from './pages/StudentDetailPage.jsx'
 import CourseEditPage from './pages/CourseEditPage.jsx'
 import LessonEditorPage from './pages/LessonEditorPage.jsx'
@@ -21,6 +22,7 @@ import SlideshowEditorPage from './pages/SlideshowEditorPage.jsx'
 import ImageLessonEditorPage from './pages/ImageLessonEditorPage.jsx'
 import RequireAuth from './components/RequireAuth.jsx'
 import RequireStaff from './components/RequireStaff.jsx'
+import RequireSuperadmin from './components/RequireSuperadmin.jsx'
 import RequireOnboarding from './components/RequireOnboarding.jsx'
 import OnboardingLayout from './components/onboarding/OnboardingLayout.jsx'
 import DashboardPage from './pages/onboarding/DashboardPage.jsx'
@@ -111,15 +113,17 @@ function App() {
   const staffUnknown = isAuthed && user?.is_staff === undefined
   const onboardingUnknown =
     isAuthed && user?.is_staff && !('onboarding_role' in (user || {}))
+  const superadminUnknown =
+    isAuthed && user?.is_staff && !('is_superuser' in (user || {}))
   useEffect(() => {
-    if (!staffUnknown && !onboardingUnknown) return
+    if (!staffUnknown && !onboardingUnknown && !superadminUnknown) return
     fetchMe()
       .unwrap()
       .then((me) => dispatch(setUser(me)))
       .catch(() => {
         // Token expired or the API is down — RequireAuth/login handles it.
       })
-  }, [staffUnknown, onboardingUnknown, fetchMe, dispatch])
+  }, [staffUnknown, onboardingUnknown, superadminUnknown, fetchMe, dispatch])
 
   // Hold the routes back while the GHL id is exchanged, so the visitor sees a
   // sign-in splash instead of a flash of the login page they're bypassing.
@@ -166,6 +170,9 @@ function App() {
         <Route element={<RequireStaff />}>
           <Route path="/admin" element={<AdminPage />} />
           <Route path="/admin/students" element={<StudentsPage />} />
+          <Route element={<RequireSuperadmin />}>
+            <Route path="/admin/users" element={<AdminUsersPage />} />
+          </Route>
           <Route
             path="/admin/students/:studentId"
             element={<StudentDetailPage />}

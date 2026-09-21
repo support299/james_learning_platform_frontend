@@ -45,6 +45,21 @@ describe('AccountMenu eligibility', () => {
     },
   )
 
+  test('only a superadmin sees the Admin users link', async () => {
+    await openMenu({ isAdmin: true, onboardingRole: null, isSuperadmin: true })
+    expect(screen.getByRole('menuitem', { name: /admin users/i })).toBeInTheDocument()
+  })
+
+  test('plain staff does not see Admin users', async () => {
+    await openMenu({ isAdmin: true, onboardingRole: 'assistant', isSuperadmin: false })
+    expect(screen.queryByRole('menuitem', { name: /admin users/i })).not.toBeInTheDocument()
+  })
+
+  test('a non-staff account never sees Admin users even if the flag leaked', async () => {
+    await openMenu({ isAdmin: false, isSuperadmin: true })
+    expect(screen.queryByRole('menuitem', { name: /admin users/i })).not.toBeInTheDocument()
+  })
+
   test('a non-staff account is never shown the Onboarding link even if a stray role value were passed', async () => {
     // Defense in depth: onboarding_role is never non-null for is_staff=False
     // server-side (onboarding_role() returns None outright), but the menu

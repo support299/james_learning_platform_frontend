@@ -6,6 +6,7 @@ import {
   selectCurrentUser,
   selectIsStaff,
   selectOnboardingRole,
+  selectIsSuperadmin,
 } from '../store/authSlice.js'
 import { SearchIcon, LogoMark } from './Icons.jsx'
 import AccountMenu from './AccountMenu.jsx'
@@ -21,6 +22,7 @@ export default function SiteHeader({
   const user = useSelector(selectCurrentUser)
   const isAdmin = useSelector(selectIsStaff)
   const onboardingRole = useSelector(selectOnboardingRole)
+  const isSuperadmin = useSelector(selectIsSuperadmin)
 
   const signOut = () => {
     dispatch(logout())
@@ -59,6 +61,7 @@ export default function SiteHeader({
               user={user}
               isAdmin={isAdmin}
               onboardingRole={onboardingRole}
+              isSuperadmin={isSuperadmin}
               onLogout={signOut}
             />
           ) : (

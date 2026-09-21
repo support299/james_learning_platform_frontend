@@ -18,16 +18,26 @@ const authSlice = createSlice({
   reducers: {
     setCredentials(state, action) {
       // `is_admin` rides along with the tokens from /login and /register.
-      const { user, access, refresh, is_admin: isAdmin } = action.payload
+      const {
+        user,
+        access,
+        refresh,
+        is_admin: isAdmin,
+        is_superadmin: isSuperadmin,
+      } = action.payload
       if (user !== undefined) state.user = user
       if (access !== undefined) state.access = access
       if (refresh !== undefined) state.refresh = refresh
       if (isAdmin !== undefined) state.isAdmin = Boolean(isAdmin)
+      if (isSuperadmin !== undefined) state.isSuperadmin = Boolean(isSuperadmin)
     },
     setUser(state, action) {
       state.user = action.payload
       if (action.payload?.is_staff !== undefined) {
         state.isAdmin = Boolean(action.payload.is_staff)
+      }
+      if (action.payload?.is_superuser !== undefined) {
+        state.isSuperadmin = Boolean(action.payload.is_superuser)
       }
     },
     logout(state) {
@@ -35,6 +45,7 @@ const authSlice = createSlice({
       state.access = null
       state.refresh = null
       state.isAdmin = false
+      state.isSuperadmin = false
     },
   },
 })
@@ -49,6 +60,12 @@ export const selectIsStaff = (state) =>
 // admin gate waits for a fresh /me rather than bouncing the user out.
 export const selectStaffKnown = (state) =>
   state.auth.isAdmin !== undefined || state.auth.user?.is_staff !== undefined
+
+export const selectIsSuperadmin = (state) =>
+  Boolean(state.auth.isSuperadmin ?? state.auth.user?.is_superuser)
+export const selectSuperadminKnown = (state) =>
+  state.auth.isSuperadmin !== undefined ||
+  state.auth.user?.is_superuser !== undefined
 
 export const selectOnboardingRole = (state) =>
   state.auth.user?.onboarding_role ?? null

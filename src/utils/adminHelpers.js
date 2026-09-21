@@ -41,3 +41,14 @@ export function extractYouTubeId(input) {
   }
   return null
 }
+
+// Flatten a DRF error body ({field: [msgs]} or {detail: msg}) into one string.
+export function errorMessage(err, fallback) {
+  const data = err?.data
+  if (!data) return fallback
+  if (typeof data.detail === 'string') return data.detail
+  const [field, value] = Object.entries(data)[0] ?? []
+  const message = Array.isArray(value) ? value[0] : value
+  if (typeof message !== 'string') return fallback
+  return field === 'non_field_errors' ? message : `${field}: ${message}`
+}
