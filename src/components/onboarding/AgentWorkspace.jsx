@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { inputClass, monoLabel } from '../adminUi.jsx'
 import StatusPill from './StatusPill.jsx'
+import WritingNumberInput from './WritingNumberInput.jsx'
 import { formatDate } from '../../utils/adminHelpers.js'
 
 const carrierStatuses = [
@@ -107,21 +108,25 @@ export default function AgentWorkspace({
               <li key={item.id} className="px-4 py-3">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <label className="flex items-start gap-3 text-sm text-stone-900">
-                    <input
-                      type="checkbox"
-                      className="mt-0.5"
-                      checked={item.isCompleted}
-                      disabled={!writable}
-                      onChange={(e) =>
-                        run(() =>
-                          patchItem({
-                            agentId: agent.id,
-                            itemId: item.id,
-                            is_completed: e.target.checked,
-                          }).unwrap(),
-                        )
-                      }
-                    />
+                    {item.status === 'approved' ? (
+                      <span className="text-stone-700">Approved</span>
+                    ) : (
+                      <input
+                        type="checkbox"
+                        className="mt-0.5"
+                        checked={item.isCompleted}
+                        disabled={!writable}
+                        onChange={(e) =>
+                          run(() =>
+                            patchItem({
+                              agentId: agent.id,
+                              itemId: item.id,
+                              is_completed: e.target.checked,
+                            }).unwrap(),
+                          )
+                        }
+                      />
+                    )}
                     <span>
                       <span className={item.isCompleted ? 'text-stone-400 line-through' : ''}>
                         {item.label}
@@ -200,6 +205,7 @@ export default function AgentWorkspace({
                       <tr>
                         <th className="px-4 py-3 font-medium text-stone-600">Carrier</th>
                         <th className="px-4 py-3 font-medium text-stone-600">Status</th>
+                        <th className="px-4 py-3 font-medium text-stone-600">Writing number</th>
                         {showFlags && (
                           <th className="px-4 py-3 font-medium text-stone-600">Flag</th>
                         )}
@@ -236,6 +242,21 @@ export default function AgentWorkspace({
                                 ))}
                               </select>
                             )}
+                          </td>
+                          <td className="px-4 py-3">
+                            <WritingNumberInput
+                              value={req.writingNumber}
+                              disabled={!writable}
+                              onSave={(writingNumber) =>
+                                run(() =>
+                                  patchCarrier({
+                                    agentId: agent.id,
+                                    reqId: req.id,
+                                    writing_number: writingNumber,
+                                  }).unwrap(),
+                                )
+                              }
+                            />
                           </td>
                           {showFlags && (
                             <td className="px-4 py-3">

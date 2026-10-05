@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { Fragment, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useSelector } from 'react-redux'
 import {
@@ -17,12 +17,19 @@ import {
 import StatusPill, { errorMessage } from '../../components/onboarding/StatusPill.jsx'
 import { formatDate } from '../../utils/adminHelpers.js'
 
+const checklistStatuses = [
+  { value: 'incomplete', label: 'Incomplete' },
+  { value: 'completed', label: 'Completed' },
+  { value: 'approved', label: 'Approved' },
+]
+
 export default function AuditPage() {
   const role = useSelector(selectOnboardingRole)
   const writable = role === 'assistant' || role === 'recruiter'
   const [cohort, setCohort] = useState('')
   const [owner, setOwner] = useState('')
   const [flagged, setFlagged] = useState(false)
+  const [openAgents, setOpenAgents] = useState(() => new Set())
   const params = useMemo(
     () => ({ cohort, owner, flagged: flagged ? '1' : '' }),
     [cohort, owner, flagged],
@@ -35,6 +42,35 @@ export default function AuditPage() {
   const [error, setError] = useState(null)
 
   const rows = data?.results ?? []
+  const groups = useMemo(() => {
+    const order = []
+    const byAgent = new Map()
+    for (const row of rows) {
+      let group = byAgent.get(row.agentId)
+      if (!group) {
+        group = {
+          agentId: row.agentId,
+          agentName: row.agentName,
+          cohortName: row.cohortName,
+          agentStatus: row.agentStatus,
+          items: [],
+        }
+        byAgent.set(row.agentId, group)
+        order.push(group)
+      }
+      group.items.push(row)
+    }
+    return order
+  }, [rows])
+
+  const toggleAgent = (agentId) => {
+    setOpenAgents((current) => {
+      const next = new Set(current)
+      if (next.has(agentId)) next.delete(agentId)
+      else next.add(agentId)
+      return next
+    })
+  }
 
   const patch = async (row, body) => {
     setError(null)
@@ -55,7 +91,7 @@ export default function AuditPage() {
         Friday audit
       </h1>
       <p className="mt-1.5 text-stone-500">
-        Everything still incomplete on active teams. Flag, comment, or assign an owner without leaving this list.
+        One row per agent. Open a row to update checklist items and statuses.
       </p>
 
       <div className="mt-8 grid gap-3 border-y border-stone-200 py-5 sm:grid-cols-3">
@@ -105,96 +141,186 @@ export default function AuditPage() {
       {!isLoading && rows.length === 0 && (
         <p className="mt-6 text-sm text-stone-500">No outstanding items for this filter.</p>
       )}
-      {rows.length > 0 && (
+      {groups.length > 0 && (
         <div className="mt-6 overflow-x-auto border border-stone-200 bg-white">
           <table className="w-full text-left text-sm">
             <thead className="border-b border-stone-200 bg-stone-50">
               <tr>
+                <th className="w-10 px-4 py-3" />
                 <th className="px-4 py-3 font-medium text-stone-600">Agent</th>
-                <th className="px-4 py-3 font-medium text-stone-600">Item</th>
-                <th className="px-4 py-3 font-medium text-stone-600">Carrier</th>
-                <th className="px-4 py-3 font-medium text-stone-600">Owner</th>
+                <th className="px-4 py-3 font-medium text-stone-600">Open items</th>
                 <th className="px-4 py-3 font-medium text-stone-600">Status</th>
-                <th className="px-4 py-3 font-medium text-stone-600">Context</th>
-                <th className="px-4 py-3 font-medium text-stone-600" />
               </tr>
             </thead>
             <tbody>
-              {rows.map((row) => (
-                <tr
-                  key={`${row.itemType}-${row.itemId}`}
-                  className="border-b border-stone-100 align-top"
-                >
-                  <td className="px-4 py-3">
-                    <Link
-                      to={`/onboarding/agents/${row.agentId}`}
-                      className="font-semibold text-stone-900 hover:text-orange-700"
+              {groups.map((group) => {
+                const open = openAgents.has(group.agentId)
+                return (
+                  <Fragment key={group.agentId}>
+                    <tr
+                      className="cursor-pointer border-b border-stone-100 hover:bg-stone-50"
+                      onClick={() => toggleAgent(group.agentId)}
                     >
-                      {row.agentName}
-                    </Link>
-                    <p className="text-xs text-stone-500">{row.cohortName}</p>
-                  </td>
-                  <td className="px-4 py-3">
-                    {row.label}
-                    {row.isFlagged && (
-                      <span className="ml-2 font-mono text-[10px] text-amber-700 uppercase">
-                        flagged
-                      </span>
+                      <td className="px-4 py-3">
+                        <button
+                          type="button"
+                          aria-expanded={open}
+                          aria-label={`${open ? 'Hide' : 'Show'} checklist for ${group.agentName}`}
+                          className="font-mono text-stone-500"
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            toggleAgent(group.agentId)
+                          }}
+                        >
+                          {open ? '▾' : '▸'}
+                        </button>
+                      </td>
+                      <td className="px-4 py-3">
+                        <Link
+                          to={`/onboarding/agents/${group.agentId}`}
+                          className="font-semibold text-stone-900 hover:text-orange-700"
+                          onClick={(event) => event.stopPropagation()}
+                        >
+                          {group.agentName}
+                        </Link>
+                        <p className="text-xs text-stone-500">{group.cohortName}</p>
+                      </td>
+                      <td className="px-4 py-3 text-stone-600">{group.items.length}</td>
+                      <td className="px-4 py-3">
+                        <StatusPill status={group.agentStatus} />
+                      </td>
+                    </tr>
+                    {open && (
+                      <tr className="border-b border-stone-200 bg-stone-50">
+                        <td colSpan={4} className="px-4 py-4">
+                          <div className="mb-3 flex items-center justify-between gap-3">
+                            <p className="text-xs text-stone-500">
+                              Checklist items and carrier contracts still open for {group.agentName}.
+                            </p>
+                            <Link
+                              to={`/onboarding/agents/${group.agentId}`}
+                              className="text-xs font-medium text-stone-700 hover:text-orange-700"
+                              onClick={(event) => event.stopPropagation()}
+                            >
+                              Open profile
+                            </Link>
+                          </div>
+                          <div className="overflow-x-auto border border-stone-200 bg-white">
+                            <table className="w-full text-left text-sm">
+                              <thead className="border-b border-stone-200 bg-stone-50">
+                                <tr>
+                                  <th className="px-4 py-3 font-medium text-stone-600">Item</th>
+                                  <th className="px-4 py-3 font-medium text-stone-600">Carrier</th>
+                                  <th className="px-4 py-3 font-medium text-stone-600">Owner</th>
+                                  <th className="px-4 py-3 font-medium text-stone-600">Status</th>
+                                  <th className="px-4 py-3 font-medium text-stone-600">Context</th>
+                                  <th className="px-4 py-3 font-medium text-stone-600" />
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {group.items.map((row) => (
+                                  <tr
+                                    key={`${row.itemType}-${row.itemId}`}
+                                    className="border-b border-stone-100 align-top"
+                                  >
+                                    <td className="px-4 py-3">
+                                      {row.label}
+                                      {row.isFlagged && (
+                                        <span className="ml-2 font-mono text-[10px] text-amber-700 uppercase">
+                                          flagged
+                                        </span>
+                                      )}
+                                      {row.comment && (
+                                        <p className="mt-1 text-xs text-stone-500">{row.comment}</p>
+                                      )}
+                                    </td>
+                                    <td className="px-4 py-3 text-stone-600">
+                                      {row.carrier || '—'}
+                                    </td>
+                                    <td className="px-4 py-3">
+                                      {writable ? (
+                                        <select
+                                          value={row.owner?.id || ''}
+                                          className={inputClass}
+                                          aria-label={`Owner for ${row.label}`}
+                                          onClick={(event) => event.stopPropagation()}
+                                          onChange={(e) =>
+                                            patch(row, {
+                                              owner_id: e.target.value
+                                                ? Number(e.target.value)
+                                                : null,
+                                            })
+                                          }
+                                        >
+                                          <option value="">Unassigned</option>
+                                          {(staff ?? []).map((u) => (
+                                            <option key={u.id} value={u.id}>
+                                              {u.displayName}
+                                            </option>
+                                          ))}
+                                        </select>
+                                      ) : (
+                                        row.owner?.displayName || '—'
+                                      )}
+                                    </td>
+                                    <td className="px-4 py-3">
+                                      {row.itemType === 'checklist' && writable ? (
+                                        <select
+                                          value={row.status}
+                                          className={inputClass}
+                                          aria-label={`Status for ${row.label}`}
+                                          onClick={(event) => event.stopPropagation()}
+                                          onChange={(e) =>
+                                            patch(row, { status: e.target.value })
+                                          }
+                                        >
+                                          {checklistStatuses.map((opt) => (
+                                            <option key={opt.value} value={opt.value}>
+                                              {opt.label}
+                                            </option>
+                                          ))}
+                                        </select>
+                                      ) : (
+                                        <>
+                                          {row.isFlagged ? <StatusPill status="at_risk" /> : null}
+                                          <p
+                                            className={`font-mono text-[10px] uppercase ${
+                                              row.isFlagged ? 'mt-1 text-stone-500' : 'text-stone-600'
+                                            }`}
+                                          >
+                                            {row.status.replaceAll('_', ' ')}
+                                          </p>
+                                        </>
+                                      )}
+                                    </td>
+                                    <td className="px-4 py-3 text-xs text-stone-500">
+                                      {row.dueContext}
+                                      <div>{formatDate(row.startDate)}</div>
+                                    </td>
+                                    <td className="px-4 py-3">
+                                      {writable && (
+                                        <button
+                                          type="button"
+                                          className={outlineButton}
+                                          onClick={() =>
+                                            patch(row, { is_flagged: !row.isFlagged })
+                                          }
+                                        >
+                                          {row.isFlagged ? 'Unflag' : 'Flag'}
+                                        </button>
+                                      )}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </td>
+                      </tr>
                     )}
-                    {row.comment && (
-                      <p className="mt-1 text-xs text-stone-500">{row.comment}</p>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-stone-600">{row.carrier || '—'}</td>
-                  <td className="px-4 py-3">
-                    {writable ? (
-                      <select
-                        value={row.owner?.id || ''}
-                        className={inputClass}
-                        onChange={(e) =>
-                          patch(row, {
-                            owner_id: e.target.value ? Number(e.target.value) : null,
-                          })
-                        }
-                      >
-                        <option value="">Unassigned</option>
-                        {(staff ?? []).map((u) => (
-                          <option key={u.id} value={u.id}>
-                            {u.displayName}
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      row.owner?.displayName || '—'
-                    )}
-                  </td>
-                  <td className="px-4 py-3">
-                    {row.isFlagged ? <StatusPill status="at_risk" /> : null}
-                    <p
-                      className={`font-mono text-[10px] uppercase ${
-                        row.isFlagged ? 'mt-1 text-stone-500' : 'text-stone-600'
-                      }`}
-                    >
-                      {row.status.replaceAll('_', ' ')}
-                    </p>
-                  </td>
-                  <td className="px-4 py-3 text-xs text-stone-500">
-                    {row.dueContext}
-                    <div>{formatDate(row.startDate)}</div>
-                  </td>
-                  <td className="px-4 py-3">
-                    {writable && (
-                      <button
-                        type="button"
-                        className={outlineButton}
-                        onClick={() => patch(row, { is_flagged: !row.isFlagged })}
-                      >
-                        {row.isFlagged ? 'Unflag' : 'Flag'}
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
+                  </Fragment>
+                )
+              })}
             </tbody>
           </table>
         </div>

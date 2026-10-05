@@ -11,12 +11,19 @@ import {
 import { selectOnboardingRole } from '../../store/authSlice.js'
 import { inputClass, monoLabel, outlineButton } from '../../components/adminUi.jsx'
 import StatusPill, { errorMessage } from '../../components/onboarding/StatusPill.jsx'
+import WritingNumberInput from '../../components/onboarding/WritingNumberInput.jsx'
 import { formatDate } from '../../utils/adminHelpers.js'
 
 const carrierStatuses = [
   { value: 'not_started', label: 'Not Started' },
   { value: 'in_progress', label: 'In Progress' },
   { value: 'submitted', label: 'Submitted' },
+  { value: 'approved', label: 'Approved' },
+]
+
+const checklistStatuses = [
+  { value: 'incomplete', label: 'Incomplete' },
+  { value: 'completed', label: 'Completed' },
   { value: 'approved', label: 'Approved' },
 ]
 
@@ -134,24 +141,36 @@ export default function AgentDetailPage() {
             {agent.checklist.map((item) => (
               <li key={item.id} className="px-4 py-3">
                 <div className="flex flex-wrap items-start justify-between gap-3">
-                  <label className="flex items-start gap-3 text-sm text-stone-900">
-                    <input
-                      type="checkbox"
-                      className="mt-0.5"
-                      checked={item.isCompleted}
-                      disabled={!writable}
-                      onChange={(e) =>
-                        run(() =>
-                          patchItem({
-                            agentId: agent.id,
-                            itemId: item.id,
-                            is_completed: e.target.checked,
-                          }).unwrap(),
-                        )
-                      }
-                    />
+                  <div className="flex items-start gap-3 text-sm text-stone-900">
+                    <div className="w-40 shrink-0">
+                      <select
+                        value={item.status}
+                        disabled={!writable}
+                        className={inputClass}
+                        aria-label={`Status for ${item.label}`}
+                        onChange={(e) =>
+                          run(() =>
+                            patchItem({
+                              agentId: agent.id,
+                              itemId: item.id,
+                              status: e.target.value,
+                            }).unwrap(),
+                          )
+                        }
+                      >
+                        {checklistStatuses.map((opt) => (
+                          <option key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                     <span>
-                      <span className={item.isCompleted ? 'text-stone-400 line-through' : ''}>
+                      <span
+                        className={
+                          item.status === 'incomplete' ? '' : 'text-stone-400 line-through'
+                        }
+                      >
                         {item.label}
                       </span>
                       {!item.isRequired && (
@@ -163,7 +182,7 @@ export default function AgentDetailPage() {
                         </span>
                       )}
                     </span>
-                  </label>
+                  </div>
                   {writable && (
                     <button
                       type="button"
@@ -249,6 +268,7 @@ export default function AgentDetailPage() {
                       <tr>
                         <th className="px-4 py-3 font-medium text-stone-600">Carrier</th>
                         <th className="px-4 py-3 font-medium text-stone-600">Status</th>
+                        <th className="px-4 py-3 font-medium text-stone-600">Writing number</th>
                         <th className="px-4 py-3 font-medium text-stone-600">Owner</th>
                         <th className="px-4 py-3 font-medium text-stone-600">Flag</th>
                       </tr>
@@ -278,6 +298,21 @@ export default function AgentDetailPage() {
                                 </option>
                               ))}
                             </select>
+                          </td>
+                          <td className="px-4 py-3">
+                            <WritingNumberInput
+                              value={req.writingNumber}
+                              disabled={!writable}
+                              onSave={(writingNumber) =>
+                                run(() =>
+                                  patchCarrier({
+                                    agentId: agent.id,
+                                    reqId: req.id,
+                                    writing_number: writingNumber,
+                                  }).unwrap(),
+                                )
+                              }
+                            />
                           </td>
                           <td className="px-4 py-3">
                             <select

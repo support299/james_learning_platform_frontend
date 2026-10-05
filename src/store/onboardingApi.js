@@ -19,6 +19,7 @@ function fromChecklist(item) {
   return {
     id: item.id,
     label: item.label,
+    status: item.status || (item.is_completed ? 'completed' : 'incomplete'),
     isRequired: item.is_required,
     isCompleted: item.is_completed,
     completedBy: fromUser(item.completed_by),
@@ -39,6 +40,7 @@ function fromCarrierReq(req) {
     carrierCode: req.carrier_code,
     carrierLine: req.carrier_line || 'life',
     status: req.status,
+    writingNumber: req.writing_number ?? null,
     isRequired: req.is_required,
     owner: fromUser(req.owner),
     comment: req.comment || '',
