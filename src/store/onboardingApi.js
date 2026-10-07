@@ -354,7 +354,7 @@ export const onboardingApi = createApi({
     }),
     createCarrier: builder.mutation({
       query: (body) => ({ url: 'onboarding/carriers/', method: 'POST', body }),
-      invalidatesTags: ['OnboardingCatalog'],
+      invalidatesTags: ['OnboardingCatalog', 'OnboardingAgent', 'OnboardingDashboard', 'OnboardingAudit'],
     }),
     deleteCarrier: builder.mutation({
       query: (id) => ({ url: `onboarding/carriers/${id}/`, method: 'DELETE' }),
@@ -377,7 +377,7 @@ export const onboardingApi = createApi({
         method: 'POST',
         body,
       }),
-      invalidatesTags: ['OnboardingCatalog'],
+      invalidatesTags: ['OnboardingCatalog', 'OnboardingAgent', 'OnboardingDashboard', 'OnboardingAudit'],
     }),
     deleteChecklistDefinition: builder.mutation({
       query: (id) => ({

@@ -19,6 +19,7 @@ import { selectOnboardingRole } from '../../store/authSlice.js'
 import {
   ConfirmModal,
   Field,
+  Modal,
   blackButton,
   inputClass,
   outlineButton,
@@ -51,6 +52,8 @@ export default function SettingsPage() {
   const [error, setError] = useState(null)
   const [notice, setNotice] = useState(null)
   const [pendingDelete, setPendingDelete] = useState(null)
+  const [pendingAdd, setPendingAdd] = useState(null)
+  const [adding, setAdding] = useState(false)
 
   useEffect(() => {
     if (!settings) return
@@ -78,33 +81,63 @@ export default function SettingsPage() {
     }
   }
 
-  const addCarrier = async (e) => {
+  const addCarrier = (e) => {
     e.preventDefault()
     if (!carrierName.trim()) return
     setError(null)
-    try {
-      await createCarrier({
-        name: carrierName.trim(),
-        line: carrierLine,
-      }).unwrap()
-      setCarrierName('')
-    } catch (err) {
-      setError(errorMessage(err, 'Could not add carrier.'))
-    }
+    setNotice(null)
+    setPendingAdd({
+      kind: 'carrier',
+      name: carrierName.trim(),
+      line: carrierLine,
+    })
   }
 
-  const addItem = async (e) => {
+  const addItem = (e) => {
     e.preventDefault()
     if (!itemLabel.trim()) return
     setError(null)
+    setNotice(null)
+    setPendingAdd({ kind: 'item', label: itemLabel.trim() })
+  }
+
+  const confirmAdd = async (applyTo) => {
+    if (!pendingAdd) return
+    setAdding(true)
+    setError(null)
     try {
-      await createDefinition({
-        label: itemLabel.trim(),
-        is_required: true,
-      }).unwrap()
-      setItemLabel('')
+      const result =
+        pendingAdd.kind === 'carrier'
+          ? await createCarrier({
+              name: pendingAdd.name,
+              line: pendingAdd.line,
+              apply_to: applyTo,
+            }).unwrap()
+          : await createDefinition({
+              label: pendingAdd.label,
+              is_required: true,
+              apply_to: applyTo,
+            }).unwrap()
+      if (pendingAdd.kind === 'carrier') setCarrierName('')
+      else setItemLabel('')
+      const label = pendingAdd.kind === 'carrier' ? pendingAdd.name : pendingAdd.label
+      setNotice(
+        applyTo === 'existing'
+          ? `Added "${label}" to ${result.applied_to_agents} existing agent${result.applied_to_agents === 1 ? '' : 's'}.`
+          : `Added "${label}" for new teams only.`,
+      )
+      setPendingAdd(null)
     } catch (err) {
-      setError(errorMessage(err, 'Could not add checklist item.'))
+      setError(
+        errorMessage(
+          err,
+          pendingAdd.kind === 'carrier'
+            ? 'Could not add carrier.'
+            : 'Could not add checklist item.',
+        ),
+      )
+    } finally {
+      setAdding(false)
     }
   }
 
@@ -271,6 +304,7 @@ export default function SettingsPage() {
         <h2 className="text-lg font-bold">Carriers</h2>
         <p className="mt-1 text-sm text-stone-500">
           Aftermath list is split into Health and Life. You can still add more.
+          New teams pick these up. You choose whether current agents get them too.
         </p>
         <form onSubmit={addCarrier} className="mt-4 flex flex-wrap gap-3">
           <select
@@ -328,6 +362,9 @@ export default function SettingsPage() {
 
       <section className="mt-8 border border-stone-200 bg-white p-6">
         <h2 className="text-lg font-bold">Checklist items</h2>
+        <p className="mt-1 text-sm text-stone-500">
+          New teams get each item. You choose whether current agents get it too.
+        </p>
         <form onSubmit={addItem} className="mt-4 flex gap-3">
           <input
             value={itemLabel}
@@ -374,6 +411,46 @@ export default function SettingsPage() {
           Use current catalog as default template
         </button>
       </section>
+
+      {pendingAdd && (
+        <Modal
+          title={pendingAdd.kind === 'carrier' ? 'Add carrier' : 'Add checklist item'}
+          onClose={() => {
+            if (!adding) setPendingAdd(null)
+          }}
+          size="sm"
+        >
+          <p className="text-sm leading-relaxed text-stone-600">
+            {`Add "${pendingAdd.kind === 'carrier' ? pendingAdd.name : pendingAdd.label}" for new teams only, or also give it to every agent already on a team?`}
+          </p>
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-end">
+            <button
+              type="button"
+              className={outlineButton}
+              disabled={adding}
+              onClick={() => setPendingAdd(null)}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className={outlineButton}
+              disabled={adding}
+              onClick={() => confirmAdd('new')}
+            >
+              New teams only
+            </button>
+            <button
+              type="button"
+              className={blackButton}
+              disabled={adding}
+              onClick={() => confirmAdd('existing')}
+            >
+              {adding ? 'Adding…' : 'All existing agents'}
+            </button>
+          </div>
+        </Modal>
+      )}
 
       {pendingDelete && (
         <ConfirmModal
